@@ -1,6 +1,7 @@
 package com.github.wechat.ilink.bot.task;
 
 import com.github.wechat.ilink.bot.config.TaskConfig;
+import com.github.wechat.ilink.bot.util.AppPaths;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,8 +20,8 @@ class TaskConfigTest {
 
         assertFalse(config.isEnabled());
         assertEquals("claude", config.getClaudePath());
-        assertEquals("data/tasks", config.getWorkspaceRoot());
-        assertEquals("data/claude-home", config.getClaudeHome());
+        assertEquals(AppPaths.data("tasks"), config.getWorkspaceRoot());
+        assertEquals(AppPaths.data("claude-home"), config.getClaudeHome());
         assertEquals("", config.getVideoReviewModel());
         assertEquals("", config.getClaudeBridgeModel());
         assertEquals("https://dashscope.aliyuncs.com/compatible-mode/v1", config.getDashscopeBaseUrl());

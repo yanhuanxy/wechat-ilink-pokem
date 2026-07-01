@@ -1,32 +1,25 @@
 package com.github.wechat.ilink.bot;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.wechat.ilink.bot.command.QrCodeProvider;
-import com.github.wechat.ilink.bot.config.ReliabilityConfig;
-import com.github.wechat.ilink.bot.llm.ChatHistoryManager;
-import com.github.wechat.ilink.bot.config.LlmConfig;
-import com.github.wechat.ilink.bot.llm.LlmProvider;
-import com.github.wechat.ilink.bot.llm.LlmRequestQueue;
-import com.github.wechat.ilink.bot.llm.ModelsConfig;
-import com.github.wechat.ilink.bot.llm.OpenAiProvider;
 import com.github.wechat.ilink.bot.config.AutogameConfig;
-import com.github.wechat.ilink.bot.mode.hook.HookContext;
-import com.github.wechat.ilink.bot.mode.hook.HookEvent;
-import com.github.wechat.ilink.bot.mode.hook.HookRegistry;
+import com.github.wechat.ilink.bot.config.LlmConfig;
+import com.github.wechat.ilink.bot.config.ReliabilityConfig;
+import com.github.wechat.ilink.bot.config.TaskConfig;
+import com.github.wechat.ilink.bot.llm.*;
 import com.github.wechat.ilink.bot.mcp.McpClient;
 import com.github.wechat.ilink.bot.mcp.McpHealthMonitor;
 import com.github.wechat.ilink.bot.mcp.McpToolRegistry;
+import com.github.wechat.ilink.bot.mode.hook.HookContext;
+import com.github.wechat.ilink.bot.mode.hook.HookEvent;
+import com.github.wechat.ilink.bot.mode.hook.HookRegistry;
 import com.github.wechat.ilink.bot.persistence.DatabaseManager;
 import com.github.wechat.ilink.bot.session.SessionManager;
-import com.github.wechat.ilink.bot.task.DashScopeVideoProvider;
-import com.github.wechat.ilink.bot.task.SkillInstaller;
-import com.github.wechat.ilink.bot.config.TaskConfig;
-import com.github.wechat.ilink.bot.task.TaskMessageHandler;
-import com.github.wechat.ilink.bot.task.TaskProvider;
-import com.github.wechat.ilink.bot.task.VideoTaskBuffer;
+import com.github.wechat.ilink.bot.task.*;
+import com.github.wechat.ilink.bot.util.AppPaths;
 import com.github.wechat.ilink.sdk.core.exception.NotLoginException;
 import com.github.wechat.ilink.sdk.core.exception.SessionExpiredException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,14 +61,14 @@ public class GameApplication {
     }
 
     public void start() {
-        dbManager = new DatabaseManager("data/farm_game.db");
+        dbManager = new DatabaseManager(AppPaths.data("farm_game.db"));
         dbManager.initialize();
 
-        reliabilityConfig = ReliabilityConfig.load("data/reliability-config.json");
+        reliabilityConfig = ReliabilityConfig.load(AppPaths.data("reliability-config.json"));
         sessionManager = new SessionManager(dbManager,
                 reliabilityConfig.getFlushDelayMs(), reliabilityConfig.getFlushIntervalMs());
 
-        ModelsConfig modelsConfig = ModelsConfig.load("data/models-config.json");
+        ModelsConfig modelsConfig = ModelsConfig.load(AppPaths.data("models-config.json"));
         LlmConfig llmConfig = modelsConfig.resolveChatLlmConfig();
         llmProvider = createProvider(llmConfig);
         chatHistory = new ChatHistoryManager(llmConfig.getMaxHistory());
@@ -99,7 +92,7 @@ public class GameApplication {
             }
         };
 
-        List<BotConfig> botConfigs = loadBotConfigs("data/bots.json");
+        List<BotConfig> botConfigs = loadBotConfigs(AppPaths.data("bots.json"));
         if (botConfigs.isEmpty()) {
             log.error("未找到 bot 配置，请在 data/bots.json 中配置至少一个 bot");
             return;
@@ -176,7 +169,7 @@ public class GameApplication {
     }
 
     void initTaskSubsystem(ModelsConfig modelsConfig) {
-        taskConfig = TaskConfig.load("data/task-config.json");
+        taskConfig = TaskConfig.load(AppPaths.data("task-config.json"));
         if (!taskConfig.isEnabled()) {
             log.info("Task 未启用（data/task-config.json 中 enabled=false 或文件未创建）");
             return;
@@ -235,7 +228,7 @@ public class GameApplication {
     }
 
     void initMcpClient() {
-        AutogameConfig config = AutogameConfig.load("data/autogame-config.json");
+        AutogameConfig config = AutogameConfig.load(AppPaths.data("autogame-config.json"));
         if (!config.isEnabled()) {
             log.info("Autogame MCP 未启用（data/autogame-config.json 中 enabled=false 或文件未创建）");
             return;
@@ -382,14 +375,29 @@ public class GameApplication {
     List<BotConfig> loadBotConfigs(String path) {
         File file = new File(path);
         if (!file.exists()) {
-            log.warn("Bot 配置文件不存在: {}，使用默认单 bot 配置", path);
-            return Collections.singletonList(new BotConfig("default", null));
+            List<BotConfig> defaults = Collections.singletonList(new BotConfig("default", null));
+            createBotsTemplate(file, defaults);
+            log.warn("Bot 配置文件不存在: {}，已生成模板并使用默认单 bot 配置，请按需修改", path);
+            return defaults;
         }
         try {
             return MAPPER.readValue(file, new TypeReference<List<BotConfig>>() {});
         } catch (IOException e) {
             log.error("读取 bot 配置失败: {}", path, e);
             return Collections.emptyList();
+        }
+    }
+
+    private static void createBotsTemplate(File file, List<BotConfig> template) {
+        try {
+            File parent = file.getParentFile();
+            if (parent != null) {
+                parent.mkdirs();
+            }
+            MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, template);
+            log.info("已创建 Bot 配置模板: {}", file.getAbsolutePath());
+        } catch (IOException e) {
+            log.warn("无法创建 Bot 配置模板: {}", file.getAbsolutePath(), e);
         }
     }
 

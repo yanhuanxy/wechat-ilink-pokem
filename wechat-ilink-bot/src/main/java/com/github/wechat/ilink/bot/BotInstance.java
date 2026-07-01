@@ -3,6 +3,7 @@ package com.github.wechat.ilink.bot;
 import com.github.wechat.ilink.bot.command.CommandRegistry;
 import com.github.wechat.ilink.bot.command.QrCodeProvider;
 import com.github.wechat.ilink.bot.config.ReliabilityConfig;
+import com.github.wechat.ilink.bot.config.TaskConfig;
 import com.github.wechat.ilink.bot.engine.CommandParser;
 import com.github.wechat.ilink.bot.engine.GameEngine;
 import com.github.wechat.ilink.bot.engine.ResponseRenderer;
@@ -17,14 +18,10 @@ import com.github.wechat.ilink.bot.mode.claude.BridgeFileBuffer;
 import com.github.wechat.ilink.bot.mode.claude.BridgeWorkspace;
 import com.github.wechat.ilink.bot.mode.claude.ClaudeCodeAdapter;
 import com.github.wechat.ilink.bot.mode.hook.HookRegistry;
-import com.github.wechat.ilink.bot.persistence.ActionRankRepository;
-import com.github.wechat.ilink.bot.persistence.BotSessionRecord;
-import com.github.wechat.ilink.bot.persistence.BotSessionRepository;
-import com.github.wechat.ilink.bot.persistence.ClaudeSessionRepository;
-import com.github.wechat.ilink.bot.persistence.DatabaseManager;
+import com.github.wechat.ilink.bot.persistence.*;
 import com.github.wechat.ilink.bot.session.SessionManager;
-import com.github.wechat.ilink.bot.config.TaskConfig;
 import com.github.wechat.ilink.bot.task.TaskMessageHandler;
+import com.github.wechat.ilink.bot.util.AppPaths;
 import com.github.wechat.ilink.sdk.ILinkClient;
 import com.github.wechat.ilink.sdk.ILinkClientBuilder;
 import com.github.wechat.ilink.sdk.core.config.ILinkConfig;
@@ -373,7 +370,7 @@ public class BotInstance {
     static ClaudeModeBuild buildClaudeMode(TaskConfig taskConfig, ClaudeSessionRepository claudeRepo) {
         if (taskConfig == null) {
             return new ClaudeModeBuild(
-                    new ClaudeBridgeMode(null, claudeRepo, "data/claude-workspace", ""), null);
+                    new ClaudeBridgeMode(null, claudeRepo, AppPaths.data("claude-workspace"), ""), null);
         }
         String model = taskConfig.getClaudeBridgeModel();
         if (!taskConfig.isClaudeBridgeEnabled()) {

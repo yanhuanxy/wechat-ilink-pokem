@@ -1,6 +1,7 @@
 package com.github.wechat.ilink.bot.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.wechat.ilink.bot.util.AppPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,8 +64,8 @@ public class TaskConfig {
     public TaskConfig() {
         this.enabled = false;
         this.claudePath = "claude";
-        this.workspaceRoot = "data/tasks";
-        this.claudeHome = "data/claude-home";
+        this.workspaceRoot = AppPaths.data("tasks");
+        this.claudeHome = AppPaths.data("claude-home");
         this.videoReviewModel = "";
         this.claudeBridgeModel = "";
         this.claudeBridgeSmallModel = "";
@@ -81,7 +82,7 @@ public class TaskConfig {
         this.maxVideoBytes = DEFAULT_MAX_VIDEO_BYTES;
         this.bufferTtlMs = DEFAULT_BUFFER_TTL_MS;
         this.claudeBridgeEnabled = false;
-        this.claudeBridgeCwd = "data/claude-workspace";
+        this.claudeBridgeCwd = AppPaths.data("claude-workspace");
         this.claudeBridgeMaxHistorySessions = 50;
         this.claudeBridgePermissionMode = "default";
         this.claudeBridgeAllowedTools = new ArrayList<String>();
