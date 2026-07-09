@@ -2,6 +2,7 @@ package com.github.wechat.ilink.bot.mode.claude;
 
 import com.github.wechat.ilink.bot.llm.ModelsConfig;
 import com.github.wechat.ilink.bot.config.TaskConfig;
+import com.github.wechat.ilink.bot.util.AppPaths;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,6 +14,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -29,12 +32,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 即被测对象就是生产逻辑。打印下发 env（脱敏）+ claude 全量 stdout/stderr + exit code，
  * 用于定位 {@code 400 [1211] 模型不存在} 到底是哪个模型：绿=生产代码已 OK；红=输出精确指出报错的模型名。
  *
- * <p>配置来源：{@code ../data/models-config.json}（相对模块根目录）—— 共享 DashScope provider + bridge 模型。
+ * <p>配置来源：models-config.json，由 {@link #resolveModelsConfigPath()} 可移植定位
+ * （环境变量 {@code MODELS_CONFIG_PATH} → 生产 {@code AppPaths.data()} → 向上查找 {@code data/}）。
  */
 @EnabledIfEnvironmentVariable(named = "CLAUDE_BRIDGE_LIVE", matches = "true")
 class ClaudeCodeAdapterLiveTest {
 
-    private static final String MODELS_CONFIG_PATH = "D:\\IDEAGithubWork\\wechat-ilink\\data\\models-config.json";
     private static final String PROMPT = "只回复两个字：你好";
     private static final long TIMEOUT_MS = 120_000L;
     private static final int TAIL_LEN = 4000;
@@ -46,16 +49,16 @@ class ClaudeCodeAdapterLiveTest {
         ClaudeCodeAdapterLiveTest t = new ClaudeCodeAdapterLiveTest();
         // main 不经 JUnit，@TempDir 不会注入，手动建一个工作目录
         t.tempDir = Files.createTempDirectory("claude-bridge-live-").toFile();
-        System.out.println("\n===== A) 对照：用户客户端已知可用模型（omni + dated-max + flash）=====");
+        System.out.println("\n===== A) 当前生产 code-built（bridge.model）=====");
         try {
-            t.subprocess_userClientEnv_control();
-            System.out.println(">>> A 结果：成功（用户那套模型可用，证明问题在模型 ID）");
+            t.subprocess_codeBuiltEnv_returnsResult();
+            System.out.println(">>> A 结果：成功");
         } catch (Throwable e) {
             System.out.println(">>> A 结果：失败 " + rootMsg(e));
         }
-        System.out.println("\n===== B) 当前生产 code-built（bridge.model=qwen3.7-max 无日期）=====");
+        System.out.println("\n===== B) 提权档写文件（bypass 回归）=====");
         try {
-            t.subprocess_codeBuiltEnv_returnsResult();
+            t.subprocess_privilegedTier_canWriteFile();
             System.out.println(">>> B 结果：成功");
         } catch (Throwable e) {
             System.out.println(">>> B 结果：失败 " + rootMsg(e));
@@ -84,26 +87,6 @@ class ClaudeCodeAdapterLiveTest {
         Map<String, String> env = new HashMap<String, String>();
         ClaudeCodeAdapter.applyBridgeEnv(env, cfg);
         runAndAssert("code-built", args, env);
-    }
-
-    /** 对照：用用户客户端那套已知可用模型（main=omni，roles=dated-max，haiku=flash），隔离"模型 ID 是否根因"。 */
-    @Test
-    void subprocess_userClientEnv_control() throws Exception {
-        TaskConfig cfg = buildBridgeConfig();
-        cfg.setClaudeBridgeModel("qwen3.5-omni-plus");
-        ClaudeCodeAdapter adapter = new ClaudeCodeAdapter(cfg);
-        List<String> args = adapter.buildArgs(PROMPT, null, false, false);
-
-        Map<String, String> env = new HashMap<String, String>();
-        ClaudeCodeAdapter.applyBridgeEnv(env, cfg);   // 清污染 + Bearer + flags
-        // 覆盖成用户客户端已知可用的角色模型（dated 版）
-        env.put("ANTHROPIC_MODEL", "qwen3.5-omni-plus");
-        env.put("ANTHROPIC_SMALL_FAST_MODEL", "qwen3.6-flash");
-        env.put("ANTHROPIC_DEFAULT_HAIKU_MODEL", "qwen3.6-flash");
-        env.put("ANTHROPIC_DEFAULT_SONNET_MODEL", "qwen3.7-max-2026-05-20");
-        env.put("ANTHROPIC_DEFAULT_OPUS_MODEL", "qwen3.7-max-2026-05-20");
-        env.put("ANTHROPIC_REASONING_MODEL", "qwen3.7-max-2026-05-20");
-        runAndAssert("user-client-control", args, env);
     }
 
     /**
@@ -182,9 +165,38 @@ class ClaudeCodeAdapterLiveTest {
                         + " | STDERR=" + tail(stderr, 2000));
     }
 
+    /**
+     * 可移植定位 models-config.json：优先 {@code MODELS_CONFIG_PATH} 环境变量，
+     * 其次生产 {@link AppPaths#data(String)} 解析，最后从当前目录向上查找 {@code data/models-config.json}。
+     * 三者都找不到则抛异常——绝不回退到任何硬编码本机路径。
+     */
+    private static String resolveModelsConfigPath() {
+        String env = System.getenv("MODELS_CONFIG_PATH");
+        if (env != null && !env.isEmpty() && Files.exists(Paths.get(env))) {
+            return env;
+        }
+        String viaAppPaths = AppPaths.data("models-config.json");
+        if (Files.exists(Paths.get(viaAppPaths))) {
+            return viaAppPaths;
+        }
+        Path cursor = Paths.get(".").toAbsolutePath().normalize();
+        for (int i = 0; i < 4; i++) {
+            Path candidate = cursor.resolve("data").resolve("models-config.json");
+            if (Files.exists(candidate)) {
+                return candidate.toString();
+            }
+            Path parent = cursor.getParent();
+            if (parent == null) {
+                break;
+            }
+            cursor = parent;
+        }
+        throw new IllegalStateException("找不到 models-config.json：请设置环境变量 MODELS_CONFIG_PATH 指向有效文件。");
+    }
+
     /** 复刻 {@code GameApplication.injectModelConfig} 的 bridge 注入逻辑（不依赖私有方法）。 */
     private TaskConfig buildBridgeConfig() {
-        ModelsConfig mc = ModelsConfig.load(MODELS_CONFIG_PATH);
+        ModelsConfig mc = ModelsConfig.load(resolveModelsConfigPath());
         TaskConfig cfg = new TaskConfig();
 
         ModelsConfig.Provider ds = mc.dashscope();

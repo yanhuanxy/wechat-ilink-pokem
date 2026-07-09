@@ -314,6 +314,35 @@ class ClaudeBridgeModeTest {
         assertEquals(1, awaitTurnCount(session), "成功回复应使轮次自增到 1");
     }
 
+    @Test
+    void handleText_compactFails_stillRepliesWithoutCompactNotice() throws Exception {
+        CompactFailingAdapter adapter = new CompactFailingAdapter("existing", "正常回复");
+        ClaudeBridgeMode mode = new ClaudeBridgeMode(adapter, repo, "cwd", "model",
+                null, null, executor, 3);
+        PlayerSession session = new PlayerSession("user1");
+        session.setActiveClaudeSessionId("existing");
+        for (int i = 0; i < 3; i++) {
+            session.incrementClaudeTurn();
+        }
+
+        mode.handleText(ctx, session, "用户消息");
+
+        verify(sender, timeout(2000)).sendText("user1", "正常回复");
+        assertEquals(2, adapter.prompts.size(), "达阈值应先 /compact 再处理用户消息");
+        verify(sender, never()).sendText(eq("user1"), contains("已自动压缩"));
+    }
+
+    @Test
+    void handleText_emptyResponse_sendsNoContentMessage() throws Exception {
+        FakeAdapter adapter = new FakeAdapter("new-sid", "");
+        ClaudeBridgeMode mode = new ClaudeBridgeMode(adapter, repo, "cwd", "model", executor);
+        PlayerSession session = new PlayerSession("user1");
+
+        mode.handleText(ctx, session, "消息");
+
+        verify(sender, timeout(2000)).sendText("user1", "Claude 没有返回内容。");
+    }
+
     /** 等待异步轮次计数稳定（onComplete 中自增发生在 sendText 之后，存在短暂时序差）。 */
     private static int awaitTurnCount(PlayerSession session) throws InterruptedException {
         for (int i = 0; i < 50; i++) {
@@ -430,6 +459,39 @@ class ClaudeBridgeModeTest {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+            }
+            if (sessionId != null) {
+                cb.onSessionId(sessionId);
+            }
+            cb.onComplete(response);
+        }
+    }
+
+    /** 适配器：/compact 调用走 onError、其余调用正常完成——验证自动压缩失败不阻断主回复。 */
+    private static class CompactFailingAdapter extends ClaudeCodeAdapter {
+        final List<String> prompts = Collections.synchronizedList(new ArrayList<String>());
+        private final String sessionId;
+        private final String response;
+
+        CompactFailingAdapter(String sessionId, String response) {
+            super(newConfig());
+            this.sessionId = sessionId;
+            this.response = response;
+        }
+
+        private static TaskConfig newConfig() {
+            TaskConfig c = new TaskConfig();
+            c.setClaudeBridgeCwd("cwd");
+            c.setClaudeBridgeModel("model");
+            return c;
+        }
+
+        @Override
+        public void run(String userId, String prompt, String resumeSessionId, boolean privileged, boolean plan, ClaudeAdapterCallback cb) {
+            prompts.add(prompt);
+            if ("/compact".equals(prompt)) {
+                cb.onError(new RuntimeException("compact 失败"));
+                return;
             }
             if (sessionId != null) {
                 cb.onSessionId(sessionId);

@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Session-aware Claude Code 子进程适配器（Claude Bridge 模式专用）。
- * 与 {@link ClaudeCodeProvider}（视频点评）区别：支持 --resume 续传，并在 init 事件回传 session_id。
+ * 支持 --resume 跨消息续传，并在 init 事件回传 session_id。
  */
 public class ClaudeCodeAdapter {
 

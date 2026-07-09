@@ -5,14 +5,14 @@
 
 ## 与视频点评（Review）的区别
 
-| 维度 | `task/ClaudeCodeProvider`（Review） | `mode/claude/ClaudeCodeAdapter`（Bridge） |
-|------|-----------------------------------|------------------------------------------|
-| 触发 | 上传视频（抢占式） | `/mode claude` 后的普通文本 |
-| 会话 | 单次任务，无延续 | 首条建会话，后续 `--resume` 续传 |
-| 工作目录 | per-user / per-task（`WorkspaceManager`） | 每用户 `claudeBridgeCwd/<sanitize(userId)>`（隔离，见下） |
-| 输出 | `session_id` 不关心 | init 事件回传 `session_id`，作为后续 `--resume` 参数 |
+Review 现走 `task/DashScopeVideoProvider`（DashScope OpenAI 兼容端点直连，不经 claude 子进程）；Bridge 走 `mode/claude/ClaudeCodeAdapter`（claude CLI 子进程 + stream-json）。两者实现完全独立，互不影响。
 
-两者**共用** `ClaudeCodeProvider.applyAnthropicEnv`（`public static`）注入模型环境变量，其余实现独立，互不影响。
+| 维度 | Review（`DashScopeVideoProvider`） | Bridge（`ClaudeCodeAdapter`） |
+|------|-----------------------------------|------------------------------|
+| 触发 | 上传视频（抢占式） | `/mode claude` 后的普通文本 |
+| 执行 | DashScope 直连 HTTP（OSS 上传 + `/chat/completions`） | claude CLI 子进程 |
+| 会话 | 单次任务，无延续 | 首条建会话，后续 `--resume` 续传 |
+| 输出 | SSE 解析为点评文本 | init 事件回传 `session_id`，作为后续 `--resume` 参数 |
 
 ## 组件
 
@@ -141,11 +141,11 @@ compactThreshold > 0 && 非新会话 && 有 resumeSessionId && session.getClaude
 | `claudeAdminUsers` | `[]` | 可执行 `/sudo` 提权的微信 userId 白名单；空=无人可提权 |
 | `claudeBridgeCompactThreshold` | `0` | 自动压缩阈值；`0`=关闭，`>0`=每会话累计 N 轮后下一条消息前自动 `/compact` |
 
-> 注：`permissionMode` / `allowedTools` / `disallowedTools`（无 `claudeBridge` 前缀）是**视频点评**（`ClaudeCodeProvider`）用的工具策略，与 Bridge 上面这组互相独立。视频点评是自动/受信任的后台任务，`piano-practice-review` skill 需 `Bash` 抽帧 + `Write` 写临时目录，故**刻意保持 `bypassPermissions`**，不要改成只读（会导致抽帧失败）。**连接用户的最低权限由 Bridge 受限档保证**，与此无关。
+> 注：`permissionMode` / `allowedTools` / `disallowedTools`（无 `claudeBridge` 前缀）是已移除的 Claude Code 视频点评流程遗留的工具策略字段；Review 现走 `DashScopeVideoProvider` 直连、不经 claude 子进程工具策略。Bridge 的工具策略由上表 `claudeBridge*` 字段控制。
 
-> **工具策略（Phase 3）**：`permissionMode` + `allowedTools` / `disallowedTools` 由 `ClaudeCodeProvider.appendToolPolicy`
-> 统一拼到子进程参数（`--permission-mode` 之后），Review 与 Bridge 共用。**白名单仅在非 `bypassPermissions` 模式下生效**；
-> 两列表默认空，行为与今日一致（opt-in）。逐次交互审批留待 Phase 3.2（依赖未文档化的 stream-json 控制协议）。
+> **工具策略（Phase 3）**：Bridge 由 `ClaudeCodeAdapter.appendBridgePolicy` 把 `claudeBridgeAllowedTools` / `claudeBridgeDisallowedTools`
+> 拼到子进程参数（`--permission-mode` 之后）。**白名单仅在非 `bypassPermissions` 模式下生效**；两列表默认空，行为与今日一致（opt-in）。
+> 逐次交互审批留待 Phase 3.2——已 spike 确认可行（见 [claude-bridge-phase3.2-spike.md](claude-bridge-phase3.2-spike.md)）。
 
 `claude_sessions` 表始终建好、`ClaudeSessionRepository` 始终可用，与 adapter 是否启用无关。
 

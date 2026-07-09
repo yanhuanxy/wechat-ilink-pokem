@@ -23,8 +23,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 直连 Aliyun DashScope 的 Anthropic 兼容端点，绕开 claude CLI，定位
- * {@code ClaudeCodeProvider} 出现 {@code model:<synthetic>} 0-token 错误的根因。
+ * 直连 DashScope 的 Anthropic 兼容端点（绕开 claude CLI），验证 models-config.json 中
+ * review/bridge 模型对端点可用、且不返回 {@code model:<synthetic>} 0-token 错误。
  *
  * 触发方式：{@code set ALIYUN_ANTHROPIC_LIVE=true && mvn test -Dtest=AliyunAnthropicLiveTest}
  * 未设置该环境变量时自动跳过，CI 不会跑。
