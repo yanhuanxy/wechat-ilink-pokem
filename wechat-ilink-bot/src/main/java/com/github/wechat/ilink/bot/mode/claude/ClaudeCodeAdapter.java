@@ -159,7 +159,10 @@ public class ClaudeCodeAdapter {
         // 5. 隔离子进程：独立 CLAUDE_CONFIG_DIR，避免继承用户 ~/.claude/settings.json 干扰（实测必需，
         //    否则 claude 读到宿主 settings.json 与本配置冲突 → 400 [1211]）
         if (isSet(config.getClaudeHome())) {
-            env.put("CLAUDE_CONFIG_DIR", config.getClaudeHome());
+            // 下发绝对路径：子进程 CWD 为 <claudeBridgeCwd>/<userId>，相对的 CLAUDE_CONFIG_DIR 会被
+            // claude 按自身 CWD 二次解析到不存在位置 → 隔离配置目录与已装 skill 全部失效（P0 实测缺陷 B）。
+            env.put("CLAUDE_CONFIG_DIR",
+                    Paths.get(config.getClaudeHome()).toAbsolutePath().toString());
         }
     }
 
@@ -189,8 +192,12 @@ public class ClaudeCodeAdapter {
         }
         if (privileged) {
             // 提权档：管理员经 /sudo 或 /approve 切换，bypass 忽略工具策略，故只下 permission-mode。
+            // headless -p 下 --permission-mode bypassPermissions 单独不够：bypass 仍要一次危险模式确认，
+            // 非交互无法预接受 → 子进程实际跑在受限等效档、Write/Edit/Bash 被收走（P0 实测根因）。
+            // 需 --dangerously-skip-permissions 跳过确认，等价于宿主 ~/.claude 的 skipDangerousModePermissionPrompt。
             args.add("--permission-mode");
             args.add(config.getClaudeBridgePrivilegedMode());
+            args.add("--dangerously-skip-permissions");
         } else if (plan) {
             // plan 档：--permission-mode plan，只读探索产出方案文本；复用只读白名单，不下黑名单（plan 模式本身禁写）。
             args.add("--permission-mode");

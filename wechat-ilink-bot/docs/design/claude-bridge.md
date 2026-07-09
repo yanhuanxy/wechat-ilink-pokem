@@ -71,11 +71,12 @@ handleText(ctx, session, text)
 |----|------|---------------------|----------|-----------|
 | 受限（默认） | 无需操作 | `claudeBridgePermissionMode`（`default`） | `claudeBridgeAllowedTools`（只读 `Read,LS,Glob,Grep`）+ `claudeBridgeDisallowedTools`（`Bash,Write,Edit,NotebookEdit`） | `claudeBridgeCwd/<sanitize(userId)>` |
 | plan | `/plan on`（所有用户） | `claudeBridgePlanMode`（`plan`） | 仅 `claudeBridgeAllowedTools`（只读白名单），不下黑名单（plan 模式本身禁写） | 同上 |
-| 提权 | 管理员 `/sudo on` 或 `/approve` | `claudeBridgePrivilegedMode`（`bypassPermissions`） | 不下发（bypass 忽略） | 同上 |
+| 提权 | 管理员 `/sudo on` 或 `/approve` | `claudeBridgePrivilegedMode`（`bypassPermissions`）**+ `--dangerously-skip-permissions`** | 不下发（bypass 忽略） | 同上 |
 
 - **工作空间隔离**：`ClaudeCodeAdapter.run` 以 `Paths.get(cwd, BridgeWorkspace.sanitize(userId))` 为子进程 cwd；受限档与 plan 档均为只读白名单、无 `--add-dir`，工作目录之外不可达 → **用户 A 读不到用户 B 的内容**。`/resume` 经 `SystemCommandMode.resolveSession` 按 `userId` 校验归属，且各用户 cwd 不同（claude 按 cwd 分目录存会话），跨用户续传亦不可行。
 - plan 档只读（与 default 同安全级），故 `/plan`、`/approve` 对所有用户开放；提权档绕过工具与目录限制（可管控宿主机），故 `/sudo` 仅对 `claudeAdminUsers` 白名单内的 userId 可见、可用，非白名单命中即当作未知命令，不暴露该指令存在。
 - 三档均为 transient：重启或对应 off 命令回收，默认回到受限。
+- **提权档在 headless `-p` 下必须额外带 `--dangerously-skip-permissions`**（P0 修复）：`--permission-mode bypassPermissions` 单独不够——进入 bypass 仍要一次危险模式确认，非交互环境无法预接受，claude 会静默跑在受限等效档、Write/Edit/Bash 被收走（提权形同虚设，实测根因）。该 flag 等价于宿主 `~/.claude/settings.json` 的 `skipDangerousModePermissionPrompt: true`（宿主交互式 bypass 能用的原因）；子进程配置目录被隔离、读不到宿主那份，故必须在 argv 显式下发。
 
 ### plan → approve → 执行 闭环
 
@@ -123,7 +124,7 @@ compactThreshold > 0 && 非新会话 && 有 resumeSessionId && session.getClaude
 
 **模型与 endpoint/token 在 `models-config.json`**：`bridge.model` 指定主模型；`bridge.provider` 引用 `providers.<name>` 取该 provider 的 `baseUrl`/`apiKey`（DashScope 场景下通常与 `DashScopeVideoProvider` 共用 `providers.dashscope` —— DashScope 用 `/apps/anthropic/v1` 提供 Anthropic 协议兼容，与 `/compatible-mode/v1` 的 OpenAI 协议分离）。由 `GameApplication.injectModelConfig` 按 `bridge.provider` 解析成 `TaskConfig.claudeBridgeBaseUrl`/`claudeBridgeApiKey`（未声明/未找到则回退到 `dashscope*` 字段），`bridge.model` 经 `--model` 旗标驱动主对话模型。`bridge.model` 为空时 `ClaudeCodeAdapter(config)` 单参构造抛 `IllegalStateException`。
 
-**子进程环境（`ClaudeCodeAdapter.applyBridgeEnv`，自包含）**：启动环境理论干净，程序仍**先清掉所有继承的 `ANTHROPIC_*`** 保证确定性，再下发完整一套——由 `bridge.model`/`bridge.smallModel` **派生** `ANTHROPIC_MODEL` + `ANTHROPIC_SMALL_FAST_MODEL` + `ANTHROPIC_DEFAULT_HAIKU/SONNET/OPUS_MODEL` + `ANTHROPIC_REASONING_MODEL`（haiku 用 `smallModel`，为空则用 `bridge.model`；其余用 `bridge.model`）。**关键**：claude 内部按 haiku/sonnet/opus/reasoning 角色选模型，缺失的角色会**回落到内置 Claude 模型名**（DashScope 不存在 → `400 [1211] 模型不存在`），故必须下发完整一套。配 `ANTHROPIC_BASE_URL`（bridgeBaseUrl）+ `ANTHROPIC_AUTH_TOKEN`（**Bearer**；curl 实测 `/apps/anthropic` 下 Bearer 与 x-api-key 均可用，代码统一用 Bearer）+ `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`、`ENABLE_TOOL_SEARCH=0`（关闭 Anthropic 专有、第三方兼容端点不支持的特性）。**关键（实测根因）**：`applyBridgeEnv` 另设 `CLAUDE_CONFIG_DIR=claudeHome`（`data/claude-home`），让子进程用独立配置目录、**不继承宿主 `~/.claude/settings.json`**——否则 claude 读到宿主 settings.json（如 ccswitch 激活的 GLM 配置）与本配置冲突 → `400 [1211] 模型不存在`（即便 key/端点/模型本身都有效）。`startProcess` 另以 INFO 打印下发的完整模型参数（token 脱敏），便于排查 1211。
+**子进程环境（`ClaudeCodeAdapter.applyBridgeEnv`，自包含）**：启动环境理论干净，程序仍**先清掉所有继承的 `ANTHROPIC_*`** 保证确定性，再下发完整一套——由 `bridge.model`/`bridge.smallModel` **派生** `ANTHROPIC_MODEL` + `ANTHROPIC_SMALL_FAST_MODEL` + `ANTHROPIC_DEFAULT_HAIKU/SONNET/OPUS_MODEL` + `ANTHROPIC_REASONING_MODEL`（haiku 用 `smallModel`，为空则用 `bridge.model`；其余用 `bridge.model`）。**关键**：claude 内部按 haiku/sonnet/opus/reasoning 角色选模型，缺失的角色会**回落到内置 Claude 模型名**（DashScope 不存在 → `400 [1211] 模型不存在`），故必须下发完整一套。配 `ANTHROPIC_BASE_URL`（bridgeBaseUrl）+ `ANTHROPIC_AUTH_TOKEN`（**Bearer**；curl 实测 `/apps/anthropic` 下 Bearer 与 x-api-key 均可用，代码统一用 Bearer）+ `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`、`ENABLE_TOOL_SEARCH=0`（关闭 Anthropic 专有、第三方兼容端点不支持的特性）。**关键（实测根因）**：`applyBridgeEnv` 另设 `CLAUDE_CONFIG_DIR=<claudeHome 绝对路径>`（用 `Paths.get(claudeHome).toAbsolutePath()` 下发——`task-config.json` 里的 `claudeHome` 常是相对字符串、会覆盖构造器经 `AppPaths.data()` 的绝对默认；若直接下发相对值，子进程会按自身 cwd `claudeBridgeCwd/<userId>` 二次解析到不存在位置，导致隔离配置目录与 `SkillInstaller` 装的 skill 全部失效），让子进程用独立配置目录、**不继承宿主 `~/.claude/settings.json`**——否则 claude 读到宿主 settings.json（如 ccswitch 激活的 GLM 配置）与本配置冲突 → `400 [1211] 模型不存在`（即便 key/端点/模型本身都有效）。`startProcess` 另以 INFO 打印下发的完整模型参数（token 脱敏），便于排查 1211。
 
 **运维字段在 `task-config.json`**：
 

@@ -106,6 +106,38 @@ class ClaudeCodeAdapterLiveTest {
         runAndAssert("user-client-control", args, env);
     }
 
+    /**
+     * P0 实证：提权档（privileged=true）下 claude 真能写文件。
+     *
+     * <p>复刻生产提权档参数（{@code --permission-mode bypassPermissions} + {@code --dangerously-skip-permissions}），
+     * 让 claude 在工作目录写一个标记文件并断言落盘。此前 LiveTest 只覆盖受限档（{@code buildArgs(..., false, false)}），
+     * 提权档从未对真 claude 验证过——这正是 P0 漏网根因。marker 不存在即说明 bypass 仍未进、Write 被收走。
+     */
+    @Test
+    void subprocess_privilegedTier_canWriteFile() throws Exception {
+        TaskConfig cfg = buildBridgeConfig();
+        ClaudeCodeAdapter adapter = new ClaudeCodeAdapter(cfg);
+        File marker = new File(tempDir, "bypass-marker.txt");
+        String prompt = "在当前工作目录创建文件 bypass-marker.txt，内容恰好为一行：BYPASS_OK。"
+                + "只做这一件事，完成后回复两个字：完成。";
+        List<String> args = adapter.buildArgs(prompt, null, true, false);
+
+        // 提权档必须带 --dangerously-skip-permissions（P0 修复）：headless 下不带它，bypass 确认进不去 → Write 被收走
+        assertTrue(args.contains("--dangerously-skip-permissions"),
+                "提权档应下发 --dangerously-skip-permissions");
+
+        Map<String, String> env = new HashMap<String, String>();
+        ClaudeCodeAdapter.applyBridgeEnv(env, cfg);
+        runAndAssert("privileged-write", args, env);
+
+        assertTrue(marker.exists(),
+                "提权档应能写文件（bypass 生效）；marker 不存在 = bypass 仍未进、Write 被收走。STDOUT/STDERR 见上");
+        if (marker.exists()) {
+            String content = new String(Files.readAllBytes(marker.toPath()), StandardCharsets.UTF_8).trim();
+            assertTrue(content.contains("BYPASS_OK"), "marker 内容不符: " + content);
+        }
+    }
+
     /** 跑 claude 子进程，打印 CMD/ENV/EXIT/STDOUT/STDERR 并断言成功。env 合并进继承的 JVM env（含 PATH）。 */
     private void runAndAssert(String tag, List<String> args, Map<String, String> env) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(args);

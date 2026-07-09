@@ -366,9 +366,6 @@ public class GameApplication {
         if (dbManager != null) {
             dbManager.close();
         }
-        if (mcpClient != null) {
-            mcpClient.close();
-        }
         log.info("应用已关闭");
     }
 

@@ -87,6 +87,7 @@ class ClaudeCodeAdapterTest {
         int disallowIdx = args.indexOf("--disallowedTools");
         assertTrue(disallowIdx > allowIdx, "--disallowedTools 必须在 --allowedTools 之后");
         assertEquals("Bash,Write,Edit,NotebookEdit", args.get(disallowIdx + 1));
+        assertFalse(args.contains("--dangerously-skip-permissions"), "受限档只读，不应 bypass");
     }
 
     @Test
@@ -110,6 +111,8 @@ class ClaudeCodeAdapterTest {
         int permIdx = args.indexOf("--permission-mode");
         assertTrue(permIdx >= 0);
         assertEquals("bypassPermissions", args.get(permIdx + 1));
+        assertTrue(args.contains("--dangerously-skip-permissions"),
+                "headless -p 下 bypass 仍需一次危险模式确认，须该 flag 跳过（P0 修复）");
         assertFalse(args.contains("--allowedTools"), "提权档 bypass 忽略工具策略，不应下发");
         assertFalse(args.contains("--disallowedTools"));
     }
@@ -127,6 +130,7 @@ class ClaudeCodeAdapterTest {
         assertTrue(allowIdx > permIdx, "plan 档应下只读白名单");
         assertEquals("Read,LS,Glob,Grep", args.get(allowIdx + 1));
         assertFalse(args.contains("--disallowedTools"), "plan 档不下黑名单（plan 模式本身禁写）");
+        assertFalse(args.contains("--dangerously-skip-permissions"), "plan 档只读，不应 bypass");
     }
 
     @Test
@@ -187,6 +191,21 @@ class ClaudeCodeAdapterTest {
         ClaudeCodeAdapter.applyBridgeEnv(env, cfg);
 
         assertEquals("sk-ds", env.get("ANTHROPIC_AUTH_TOKEN"));
+    }
+
+    @Test
+    void applyBridgeEnv_claudeConfigDir_emitsAbsolutePath() {
+        Map<String, String> env = new HashMap<String, String>();
+        TaskConfig cfg = new TaskConfig();
+        cfg.setClaudeBridgeModel("qwen-plus");
+        cfg.setClaudeHome("data/claude-home");   // 相对路径，模拟生产 JSON 覆盖构造器绝对默认
+
+        ClaudeCodeAdapter.applyBridgeEnv(env, cfg);
+
+        String dir = env.get("CLAUDE_CONFIG_DIR");
+        assertNotNull(dir, "claudeHome 已配置时应下发 CLAUDE_CONFIG_DIR");
+        assertTrue(java.nio.file.Paths.get(dir).isAbsolute(),
+                "CLAUDE_CONFIG_DIR 必须绝对，避免被子进程 CWD 二次解析到不存在位置（P0 缺陷 B）");
     }
 
     @Test
