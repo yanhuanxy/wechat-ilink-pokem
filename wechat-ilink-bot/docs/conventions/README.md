@@ -2,7 +2,7 @@
 
 ## 基本原则
 
-- Java 1.8（无 Java 9+ 语法）
+- Java 17（可用 Java 17 语法）
 - 无 Spring、无 DI 框架、无 Lombok
 - 构造器注入，`GameApplication` 为唯一组合根
 - 依赖方向：Application → Framework → Implementation，严格向下

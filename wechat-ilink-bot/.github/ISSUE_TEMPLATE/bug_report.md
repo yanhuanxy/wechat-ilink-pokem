@@ -22,7 +22,7 @@ assignees: ''
 
 ## 环境 / Environment
 - OS:
-- JDK 版本（应为 1.8）:
+- JDK 版本（应为 17）:
 - 项目版本 / commit:
 
 ## 日志 / Logs

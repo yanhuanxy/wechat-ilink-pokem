@@ -5,7 +5,7 @@
 
 ## 环境准备
 
-- **JDK 8**（源码目标 1.8；构建可用更高版本 JDK，但禁止使用 Java 9+ 语法）
+- **JDK 17**（源码/目标 17；可用 Java 17 语法）
 - **Maven 3.6.3+**（由 enforcer 强制）
 
 校验：
@@ -27,7 +27,7 @@ mvn clean package       # 打可运行 fat jar
 
 ## 代码约定
 
-- Java 8 语法：**禁** `var` / `record` / `sealed` / text block / switch expression / pattern matching。
+- Java 17 语法：`var` / `record` / `sealed` / text block / switch expression / pattern matching 均可用。
 - 无 Spring、无 DI 框架、无 Lombok；依赖全部**构造器注入**，字段 `private final`。
 - 单文件 ≤ 400 行，单方法 ≤ 60 行。
 - 统一 SLF4J 日志，**禁止** `System.out` / `printStackTrace`；敏感数据（token、apiKey）不得入日志。
@@ -40,5 +40,5 @@ mvn clean package       # 打可运行 fat jar
 
 ## 受保护文件（hook 守卫）
 
-`pom.xml`（技术基线：JDK 1.8 / SDK 2.3.3）和 `data/*.json`（凭证）受 `.claude/hooks/guard-edit.sh`
+`pom.xml`（技术基线：JDK 17 / SDK 3.0.0）和 `data/*.json`（凭证）受 `.claude/hooks/guard-edit.sh`
 保护，自动编辑会被阻断、需手动修改。如需升级基线版本，请在 PR 里说明动机并手动改 `pom.xml`。

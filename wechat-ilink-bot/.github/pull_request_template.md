@@ -11,7 +11,7 @@
 - [ ] docs（文档）
 
 ## 自检清单 / Checklist
-- [ ] 遵循 Java 8 语法（无 var/record/sealed/text block）
+- [ ] 遵循 Java 17 语法（var/record/sealed/text block 可用）
 - [ ] 新增/修改逻辑有 JUnit 5 测试，`mvn -B clean package` 通过
 - [ ] 未提交任何真实密钥、`*.db`、`logs/`、`data/*.json`（仅 `*.example`）
 - [ ] 按 `.claude/rules/doc-maintenance.md` 同步了相关文档

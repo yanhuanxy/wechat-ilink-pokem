@@ -4,14 +4,14 @@
 
 ## 项目简介
 
-**wechat-ilink-bot** —— 基于 `wechat-ilink-sdk-java` 2.3.3 + Java 8 + Maven 的**多模式微信机器人**。
+**wechat-ilink-bot** —— 基于 `wechat-ilink-sdk-java` 3.0.0 + Java 17 + Maven 的**多模式微信机器人**。
 框架处理多模式路由、命令解析、会话管理、消息分发与响应格式化；单个模式只需实现 `BotMode`。
 
 ## 技术栈基线（不允许擅自升级）
 
-- JDK: 1.8（不可使用 Java 9+ 语法）
+- JDK: 17（可用 Java 17 语法）
 - Maven: 3.6.3（由 enforcer 强制）
-- SDK: `io.github.lith0924:wechat-ilink-sdk:2.3.3`
+- SDK: `io.github.lith0924:wechat-ilink-sdk:3.0.0`
 - 数据库: SQLite 3.45.x + sqlite-jdbc 3.45.x（WAL 模式）
 - HTTP/SSE: okhttp + okhttp-eventsource（MCP 客户端）
 - 二维码: ZXing
