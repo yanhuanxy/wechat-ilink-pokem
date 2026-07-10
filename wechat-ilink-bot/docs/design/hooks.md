@@ -52,7 +52,7 @@
 
 唯一的 hook-like 模式是 [`RetrySender`](reliability.md)（`ModeSender` 装饰器），但只覆盖出向发送一侧。
 
-此外，本项目自己的开发期 Claude Code 配置 `.claude/settings.json` 里 `"hooks": {}` 是**空块**——CLAUDE.md 中的硬约束（Java 8、禁 Spring/Lombok、禁改 `pom.xml` 基线、`data/*.json` 含 token/apiKey）目前只靠提示词软约束，没有机械化守卫。
+此外，本项目开发期 Claude Code 配置 `.claude/settings.json` 已挂 PreToolUse 守卫：`guard-edit.sh`（Edit|Write 匹配）阻断对 `pom.xml`（技术基线）与 `data/*.json`（凭证）的自动编辑，另有 Bash 匹配器阻断 `git push`/`mvn deploy`/`rm -rf`。CLAUDE.md 的其余硬约束（Java 版本、禁 Spring/Lombok 等）仍只靠提示词软约束。
 
 本文给出**两层 harness** 的 hook 设计：Part A 是 Bot 运行时生命周期 hook 子系统；Part B 是开发期 Claude Code hooks 的建议配置。
 
@@ -75,7 +75,7 @@
 
 ### A2. hook 模型
 
-遵循项目约定（Java 8、无 DI、构造器注入、单文件 ≤400 行、`mode/` 零 SDK import）。**复用已有概念，不另造并行体系**。
+遵循项目约定（Java 17、无 DI、构造器注入、单文件 ≤400 行、`mode/` 零 SDK import）。**复用已有概念，不另造并行体系**。
 
 ```java
 /** 生命周期事件，对标 Claude Code 的 PreToolUse/PostToolUse/Stop/... */
@@ -143,7 +143,7 @@ public interface BotHook {
 
 ### A6. 取舍与风险
 
-- **勿过度设计**：Hook 接口保持最小；Java 8、构造器注入。
+- **勿过度设计**：Hook 接口保持最小；Java 17、构造器注入。
 - **预留仪器点（非死代码）**：`ON_MESSAGE_RECEIVED`/`ON_TEXT_RECEIVED`/`PRE_SEND` 有内置订阅者；`PRE_DISPATCH`/`POST_DISPATCH`/`ON_MODE_SWITCH`/`ON_ERROR`/`ON_TURN_COMPLETE`/`ON_STARTUP`/`ON_SHUTDOWN` 已在主流程接线、默认无订阅——为指标/告警/门控预留，按需注册即可。（`POST_SEND` 因无触发点已移除。）
 - **2 秒约束**：hook 跑在消息线程，审计 / 限流保持同步且廉价（μs 级）；告警 / 指标类 hook 异步，不阻塞回复。
 - **向后兼容**：每个 Phase 必须保持既有测试绿（对标 [mode-router.md](mode-router.md) 的"行为不变"原则）。

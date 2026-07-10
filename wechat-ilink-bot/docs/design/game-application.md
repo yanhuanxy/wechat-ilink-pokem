@@ -117,6 +117,6 @@ public class GameApplication {
 - 各子系统（LLM / Task / MCP）独立可选，`enabled=false` 时整段跳过，不影响其他模式
 - **多账号**：`data/bots.json` 列多个 `BotConfig`，每账号一个 `BotInstance` + 独立轮询线程；支持运行时 `createDynamic` 动态加号
 - 轮询循环含异常处理：`NotLoginException` / `SessionExpiredException` 视为永久错误移除 bot，其余按指数退避（1s→30s 封顶）重试
-- 关机钩子（匿名 `Runnable`，Java 8 兼容）确保按序清理与会话持久化
+- 关机钩子（匿名 `Runnable`，Java 17 兼容）确保按序清理与会话持久化
 - `BotInstance` 承担登录（优先免扫码复用 `bot_session`，失效再重试 `MAX_LOGIN_ATTEMPTS` 扫码）+ 登录成功后发欢迎菜单；`GameBot` 经 `setClient()` 延迟注入 `ILinkClient`
 - `LlmRequestQueue` 封装 LLM 调用的有界线程池（3 线程、50 队列容量）和每用户并发限制

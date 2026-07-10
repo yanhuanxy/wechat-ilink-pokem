@@ -36,6 +36,7 @@ public class HarvestAllCommand implements Command {
         int totalExp = 0;
         int count = 0;
         int totalStolen = 0;
+        int totalCompensation = 0;
 
         for (FarmPlot plot : activePlots) {
             if (plot.getStage() != CropStage.MATURE) {
@@ -43,14 +44,16 @@ public class HarvestAllCommand implements Command {
             }
             Crop crop = CropRegistry.get(plot.getCropType());
             if (crop != null) {
-                int stolen = stealRepo.sumStolen(session.getUserId(), plot.getIndex(),
-                        String.valueOf(plot.getPlantedAt()));
+                String plantedAt = String.valueOf(plot.getPlantedAt());
+                int stolen = stealRepo.sumStolen(session.getUserId(), plot.getIndex(), plantedAt);
+                int compensation = stealRepo.sumCompensation(session.getUserId(), plot.getIndex(), plantedAt);
                 int actualYield = Math.max(0, crop.getYieldAmount() - stolen);
                 session.getInventory().addProduce(crop.getKey(), actualYield);
                 Integer prev = harvested.get(crop.getName());
                 harvested.put(crop.getName(), (prev != null ? prev : 0) + actualYield);
                 totalExp += crop.getExpReward();
                 totalStolen += stolen;
+                totalCompensation += compensation;
                 count++;
                 stealRepo.clearPlot(session.getUserId(), plot.getIndex());
             }
@@ -62,10 +65,13 @@ public class HarvestAllCommand implements Command {
         }
 
         session.addExp(totalExp);
-        return CommandResult.success(render(harvested, totalExp, totalStolen));
+        if (totalCompensation > 0) {
+            session.addGold(totalCompensation);
+        }
+        return CommandResult.success(render(harvested, totalExp, totalStolen, totalCompensation));
     }
 
-    private String render(Map<String, Integer> harvested, int totalExp, int totalStolen) {
+    private String render(Map<String, Integer> harvested, int totalExp, int totalStolen, int totalCompensation) {
         StringBuilder sb = new StringBuilder();
         sb.append("✨ 收获结果\n");
         for (Map.Entry<String, Integer> entry : harvested.entrySet()) {
@@ -74,6 +80,9 @@ public class HarvestAllCommand implements Command {
         }
         if (totalStolen > 0) {
             sb.append("🕵️ 被偷走 ").append(totalStolen).append(" 个\n");
+        }
+        if (totalCompensation > 0) {
+            sb.append("🎁 被偷补偿 ").append(totalCompensation).append(" 金币已到账\n");
         }
         sb.append("获得经验: ").append(totalExp);
         return sb.toString();

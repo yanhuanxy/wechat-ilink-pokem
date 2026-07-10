@@ -66,5 +66,5 @@ per-user 固定窗口（`ConcurrentHashMap<userId, Window>`）：窗口内 `tryA
 
 ## 约束
 
-Java 8；字段 `private final` + 构造器注入（`McpClient` 的 `sse`/`endpointReady` 因 `reconnect()` 需可变，例外）；单文件 ≤ 400 行 / 单方法 ≤ 60 行；
+Java 17；字段 `private final` + 构造器注入（`McpClient` 的 `sse`/`endpointReady` 因 `reconnect()` 需可变，例外）；单文件 ≤ 400 行 / 单方法 ≤ 60 行；
 统一 SLF4J；`mode/` 包零 SDK import；重连/限流/刷盘全程非阻塞消息线程（监控/调度/daemon 线程）。

@@ -125,7 +125,8 @@ class FarmSocialTest {
         FarmPlot plot = session.getPlots().get(0);
         plot.plant("wheat");
         plot.setPlantedAt(0L); // 成熟
-        stealRepo.record("u1", 0, "0", "thief", 3); // 小麦产量 5，被偷 3
+        stealRepo.record("u1", 0, "0", "thief", 3, 9); // 小麦产量 5，被偷 3，补偿 9
+        int goldBefore = session.getGold();
 
         CommandResult result = new HarvestAllCommand(stealRepo).execute(session, new String[0]);
 
@@ -133,5 +134,38 @@ class FarmSocialTest {
         assertEquals(2, session.getInventory().getProduceCount("wheat"));
         assertTrue(result.getMessage().contains("被偷"));
         assertEquals(0, stealRepo.sumStolen("u1", 0, "0")); // 收获后清理
+        // 被偷补偿在收获时到账，回执含补偿行，补偿记录随之清理
+        assertEquals(goldBefore + 9, session.getGold());
+        assertTrue(result.getMessage().contains("补偿"));
+        assertEquals(0, stealRepo.sumCompensation("u1", 0, "0"));
+    }
+
+    @Test
+    void harvestAll_noStolenRecord_noCompensation() {
+        FarmPlot plot = session.getPlots().get(0);
+        plot.plant("wheat");
+        plot.setPlantedAt(0L);
+        int goldBefore = session.getGold();
+
+        CommandResult result = new HarvestAllCommand(stealRepo).execute(session, new String[0]);
+
+        assertTrue(result.isSuccess());
+        assertEquals(goldBefore, session.getGold()); // 无被偷记录则无补偿
+        assertFalse(result.getMessage().contains("补偿"));
+    }
+
+    @Test
+    void harvestAll_multipleStolenAcrossPlots_sumsCompensation() {
+        session.getPlots().get(0).plant("wheat");
+        session.getPlots().get(0).setPlantedAt(0L);
+        session.getPlots().get(1).plant("wheat");
+        session.getPlots().get(1).setPlantedAt(0L);
+        stealRepo.record("u1", 0, "0", "t1", 1, 5);
+        stealRepo.record("u1", 1, "0", "t2", 1, 7);
+        int goldBefore = session.getGold();
+
+        new HarvestAllCommand(stealRepo).execute(session, new String[0]);
+
+        assertEquals(goldBefore + 12, session.getGold()); // 5 + 7 跨地块累加
     }
 }

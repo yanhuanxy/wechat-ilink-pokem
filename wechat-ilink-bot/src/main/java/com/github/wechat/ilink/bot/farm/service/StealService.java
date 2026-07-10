@@ -14,7 +14,9 @@ import com.github.wechat.ilink.bot.persistence.StealRecordRepository;
 import com.github.wechat.ilink.bot.session.PlayerSession;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -31,8 +33,14 @@ public class StealService {
     private static final int CANDIDATE_COUNT = 3;
     private static final int SAMPLE_POOL = 20;
     private static final double STEAL_RATIO = 0.3;
+    private static final double COMPENSATION_RATIO = 0.3;
     private static final long COOLDOWN_MS = 5 * 60 * 1000L;
     private static final long CANDIDATE_TTL_MS = 5 * 60 * 1000L;
+
+    /** CommandResult.data key：被偷者 userId，FarmMode 据此尝试推送被偷通知。 */
+    public static final String VICTIM_NOTIFY_USER_ID = "victimNotifyUserId";
+    /** CommandResult.data key：被偷通知文案（补偿在收获时到账）。 */
+    public static final String VICTIM_NOTIFY_TEXT = "victimNotifyText";
 
     private final FarmPlotRepository plotRepo;
     private final PlayerRepository playerRepo;
@@ -107,20 +115,30 @@ public class StealService {
         int remaining = crop.getYieldAmount() - stealRepo.sumStolen(victimId, target.getIndex(), plantedAt);
         int qty = Math.min(remaining, Math.max(1, (int) Math.round(crop.getYieldAmount() * STEAL_RATIO)));
 
-        boolean ok = stealRepo.record(victimId, target.getIndex(), plantedAt, thief.getUserId(), qty);
+        // 被偷补偿：偷得价值的 COMPENSATION_RATIO，记进 steal_record，受害者收获时一并到账。
+        // 不在此处碰受害者金币——守"偷菜只写 steal_record、不改受害者会话/地块"的跨玩家无锁不变式。
+        int value = qty * crop.getSellPrice();
+        int compensation = (int) Math.round(value * COMPENSATION_RATIO);
+        boolean ok = stealRepo.record(victimId, target.getIndex(), plantedAt, thief.getUserId(), qty, compensation);
         if (!ok) {
             return CommandResult.error("你已经偷过这块地啦，换一家吧");
         }
         thief.getInventory().addProduce(crop.getKey(), qty);
         thief.markDirty();
-        int value = qty * crop.getSellPrice();
         rankRepo.incrementScore("STEAL", thief.getUserId(), value);
         cooldowns.put(thief.getUserId(), System.currentTimeMillis());
 
-        return CommandResult.success("🥷 你从 "
+        String thiefMessage = "🥷 你从 "
                 + FarmDisplay.name(victimId, playerRepo.getNickname(victimId))
                 + " 的农场偷走了 " + qty + "个" + crop.getEmoji() + crop.getName()
-                + "（价值" + value + "金币）！");
+                + "（价值" + value + "金币）！";
+        String victimNotify = "🕵️ 你的" + crop.getEmoji() + crop.getName() + "被"
+                + FarmDisplay.name(thief.getUserId(), playerRepo.getNickname(thief.getUserId()))
+                + "偷走" + qty + "个，系统补偿" + compensation + "金币（收获时到账）";
+        Map<String, Object> data = new HashMap<String, Object>();
+        data.put(VICTIM_NOTIFY_USER_ID, victimId);
+        data.put(VICTIM_NOTIFY_TEXT, victimNotify);
+        return CommandResult.success(thiefMessage, data);
     }
 
     /** 选价值最高且尚可偷（未偷光、本贼未偷过）的成熟地块。 */

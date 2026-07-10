@@ -96,5 +96,5 @@ McpClient（mcp/）── JSON-RPC 2.0 over HTTP+SSE ──►  autogame-xcx MCP
 
 ## 约束
 
-Java 8；字段 `private final` + 构造器注入（`McpClient` 的 `sse`/`endpointReady`/`sseAlive` 因重连需可变，例外）；单文件 ≤ 400 行 / 单方法 ≤ 60 行；
+Java 17；字段 `private final` + 构造器注入（`McpClient` 的 `sse`/`endpointReady`/`sseAlive` 因重连需可变，例外）；单文件 ≤ 400 行 / 单方法 ≤ 60 行；
 统一 SLF4J，不打印 token；`mode/` 包零 SDK import（`AutogameMode` 经 `ctx.sender()` 回发）；监控/调度全程在 daemon 线程。

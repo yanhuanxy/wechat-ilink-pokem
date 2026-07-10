@@ -6,7 +6,9 @@ import com.github.wechat.ilink.bot.engine.CommandParser;
 import com.github.wechat.ilink.bot.engine.GameEngine;
 import com.github.wechat.ilink.bot.engine.ResponseRenderer;
 import com.github.wechat.ilink.bot.farm.FarmGame;
+import com.github.wechat.ilink.bot.farm.model.FarmPlot;
 import com.github.wechat.ilink.bot.persistence.ActionRankRepository;
+import com.github.wechat.ilink.bot.persistence.FarmPlotRepository;
 import com.github.wechat.ilink.bot.persistence.DatabaseManager;
 import com.github.wechat.ilink.bot.session.PlayerSession;
 import com.github.wechat.ilink.bot.session.SessionManager;
@@ -16,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -111,5 +115,44 @@ class FarmModeTest {
         farmMode.handleText(ctx, session, "#分享");
 
         verify(sender).sendImage(eq("user1"), any(byte[].class), eq("bot-qrcode.png"), anyString());
+    }
+
+    @Test
+    void handleText_stealSuccess_pushesVictimNotify() throws Exception {
+        // victim 种一块成熟小麦
+        FarmPlotRepository plotRepo = new FarmPlotRepository(dbManager);
+        FarmPlot plot = new FarmPlot(0);
+        plot.plant("wheat");
+        plot.setPlantedAt(0L);
+        List<FarmPlot> plots = new ArrayList<>();
+        plots.add(plot);
+        plotRepo.replaceByUserId("victim", plots);
+
+        PlayerSession thief = new PlayerSession("thief");
+        farmMode.handleText(ctx, thief, "#偷菜");   // 列候选
+        farmMode.handleText(ctx, thief, "#偷菜 1"); // 执行偷取
+
+        verify(sender).sendText(eq("thief"), contains("偷走"));
+        verify(sender).sendText(eq("victim"), contains("补偿")); // 辅通道最佳 effort 推送被偷通知
+    }
+
+    @Test
+    void handleText_victimNotifyFails_swallowsAndStillRepliesToThief() throws Exception {
+        FarmPlotRepository plotRepo = new FarmPlotRepository(dbManager);
+        FarmPlot plot = new FarmPlot(0);
+        plot.plant("wheat");
+        plot.setPlantedAt(0L);
+        List<FarmPlot> plots = new ArrayList<>();
+        plots.add(plot);
+        plotRepo.replaceByUserId("victim", plots);
+        // 被偷者不活跃：sendText 抛异常（模拟 SDK 无 context token）
+        doThrow(new RuntimeException("missing context token")).when(sender).sendText(eq("victim"), anyString());
+
+        PlayerSession thief = new PlayerSession("thief");
+        farmMode.handleText(ctx, thief, "#偷菜");
+        ModeOutcome outcome = farmMode.handleText(ctx, thief, "#偷菜 1");
+
+        assertTrue(outcome.isHandled()); // 推送失败被吞，不影响偷菜者回执
+        verify(sender).sendText(eq("thief"), contains("偷走"));
     }
 }

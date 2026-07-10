@@ -3,6 +3,7 @@ package com.github.wechat.ilink.bot.mode;
 import com.github.wechat.ilink.bot.command.CommandResult;
 import com.github.wechat.ilink.bot.engine.GameEngine;
 import com.github.wechat.ilink.bot.engine.ResponseRenderer;
+import com.github.wechat.ilink.bot.farm.service.StealService;
 import com.github.wechat.ilink.bot.session.PlayerSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,10 @@ public class FarmMode implements BotMode {
                     sender.sendText(userId, response);
                 }
             }
+
+            // 偷菜辅通道：被偷者若近期活跃（内存有 context token）则推一条通知，否则静默跳过。
+            // 补偿金币 100% 在其收获时到账，通知仅补实时性，不可靠符合预期。
+            pushVictimNotify(sender, result);
         } catch (Exception e) {
             log.error("游戏处理出错, userId={}", userId, e);
             try {
@@ -64,6 +69,20 @@ public class FarmMode implements BotMode {
                 sender.sendText(userId, result.getMessage());
             } catch (Exception ignored) {
             }
+        }
+    }
+
+    /** 偷菜被偷通知：从 CommandResult.data 取被偷者与文案，最佳 effort 推送（被偷者不活跃或发送失败则静默跳过）。 */
+    private void pushVictimNotify(ModeSender sender, CommandResult result) {
+        Object victimId = result.getData().get(StealService.VICTIM_NOTIFY_USER_ID);
+        Object notifyText = result.getData().get(StealService.VICTIM_NOTIFY_TEXT);
+        if (!(victimId instanceof String) || !(notifyText instanceof String)) {
+            return;
+        }
+        try {
+            sender.sendText((String) victimId, (String) notifyText);
+        } catch (Exception e) {
+            log.warn("被偷通知推送跳过(被偷者不活跃或发送失败), victim={}", victimId);
         }
     }
 }

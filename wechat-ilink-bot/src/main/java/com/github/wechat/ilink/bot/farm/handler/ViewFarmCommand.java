@@ -48,6 +48,10 @@ public class ViewFarmCommand implements Command {
         if (stolen > 0) {
             sb.append("\n🕵️ 提醒：你有 ").append(stolen).append(" 个作物已被偷（收获时少收）");
         }
+        int pendingCompensation = stealRepo.sumCompensationByVictim(session.getUserId());
+        if (pendingCompensation > 0) {
+            sb.append("\n🎁 被偷补偿 ").append(pendingCompensation).append(" 金币待收获时到账");
+        }
         return CommandResult.success(sb.toString());
     }
 

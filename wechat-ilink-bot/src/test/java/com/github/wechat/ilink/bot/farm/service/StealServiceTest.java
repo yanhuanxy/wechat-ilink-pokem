@@ -1,6 +1,7 @@
 package com.github.wechat.ilink.bot.farm.service;
 
 import com.github.wechat.ilink.bot.command.CommandResult;
+import com.github.wechat.ilink.bot.farm.model.CropRegistry;
 import com.github.wechat.ilink.bot.farm.model.FarmPlot;
 import com.github.wechat.ilink.bot.persistence.ActionRankRepository;
 import com.github.wechat.ilink.bot.persistence.DatabaseManager;
@@ -88,6 +89,13 @@ class StealServiceTest {
         Map<String, Integer> stealRank = rankRepo.getTopScores("STEAL", 10);
         assertTrue(stealRank.containsKey("thief"));
         assertTrue(stealRank.get("thief") > 0);
+
+        // 被偷补偿记进 steal_record，被偷通知文案随 CommandResult.data 上交 FarmMode 推送
+        assertTrue(stealRepo.sumCompensation("victim", 0, "0") > 0);
+        assertEquals("victim", result.getData().get(StealService.VICTIM_NOTIFY_USER_ID));
+        String notifyText = (String) result.getData().get(StealService.VICTIM_NOTIFY_TEXT);
+        assertNotNull(notifyText);
+        assertTrue(notifyText.contains("补偿"));
     }
 
     @Test
@@ -121,10 +129,39 @@ class StealServiceTest {
 
     @Test
     void record_sameThiefSamePlot_cannotStealTwice() {
-        // 直接验证 steal_record 的防重复偷（PK 冲突）
-        assertTrue(stealRepo.record("victim", 0, "0", "thief", 2));
-        assertFalse(stealRepo.record("victim", 0, "0", "thief", 2));
+        // 直接验证 steal_record 的防重复偷（PK 冲突）。第 6 参 compensation 为被偷补偿金币。
+        assertTrue(stealRepo.record("victim", 0, "0", "thief", 2, 1));
+        assertFalse(stealRepo.record("victim", 0, "0", "thief", 2, 1));
         assertTrue(stealRepo.hasStolen("victim", 0, "0", "thief"));
         assertEquals(2, stealRepo.sumStolen("victim", 0, "0"));
+        assertEquals(1, stealRepo.sumCompensation("victim", 0, "0"));
+    }
+
+    @Test
+    void steal_compensation_isThirtyPercentOfValue() {
+        giveMatureWheat("victim");
+        PlayerSession thief = new PlayerSession("thief");
+        service.listCandidates("thief");
+        service.stealByIndex(thief, "1");
+
+        int amount = stealRepo.sumStolen("victim", 0, "0");
+        int sellPrice = CropRegistry.get("wheat").getSellPrice();
+        int expectedCompensation = (int) Math.round(amount * sellPrice * 0.3);
+        assertEquals(expectedCompensation, stealRepo.sumCompensation("victim", 0, "0"));
+    }
+
+    /** 不变式门：偷菜绝不改受害者 player 行——补偿在受害者自己收获时才到账，避免跨玩家锁竞争。 */
+    @Test
+    void steal_doesNotTouchVictimPlayerRow() {
+        giveMatureWheat("victim");
+        playerRepo.insert(new PlayerSession("victim"));
+        int goldBefore = playerRepo.findById("victim").getGold();
+
+        PlayerSession thief = new PlayerSession("thief");
+        service.listCandidates("thief");
+        CommandResult result = service.stealByIndex(thief, "1");
+
+        assertTrue(result.isSuccess());
+        assertEquals(goldBefore, playerRepo.findById("victim").getGold());
     }
 }

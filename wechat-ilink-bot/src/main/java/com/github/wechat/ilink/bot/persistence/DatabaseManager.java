@@ -91,6 +91,7 @@ public class DatabaseManager {
                     "planted_at TEXT NOT NULL," +
                     "thief_id TEXT NOT NULL," +
                     "amount INTEGER NOT NULL DEFAULT 0," +
+                    "compensation INTEGER NOT NULL DEFAULT 0," +
                     "stolen_at TEXT NOT NULL," +
                     "PRIMARY KEY (victim_id, plot_index, planted_at, thief_id))");
 
@@ -125,6 +126,7 @@ public class DatabaseManager {
 
             migratePlayerBotMode(stmt);
             migratePlayerNickname(stmt);
+            migrateStealRecordCompensation(stmt);
         }
     }
 
@@ -164,6 +166,26 @@ public class DatabaseManager {
 
     private boolean hasPlayerColumn(Statement stmt, String column) throws SQLException {
         try (java.sql.ResultSet rs = stmt.executeQuery("PRAGMA table_info(player)")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // 被偷补偿列：已上线库历史无此列时补加。纯加法、默认 0、幂等——历史记录补偿 0（收获时补偿 0，行为同迁移前）。
+    private void migrateStealRecordCompensation(Statement stmt) throws SQLException {
+        if (hasStealRecordColumn(stmt, "compensation")) {
+            return;
+        }
+        stmt.execute("ALTER TABLE steal_record ADD COLUMN compensation INTEGER NOT NULL DEFAULT 0");
+        log.info("已迁移 steal_record 表：新增 compensation 列");
+    }
+
+    private boolean hasStealRecordColumn(Statement stmt, String column) throws SQLException {
+        try (java.sql.ResultSet rs = stmt.executeQuery("PRAGMA table_info(steal_record)")) {
             while (rs.next()) {
                 if (column.equalsIgnoreCase(rs.getString("name"))) {
                     return true;

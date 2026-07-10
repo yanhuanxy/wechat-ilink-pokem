@@ -193,5 +193,5 @@ ClaudeBridgeMode.handleText（下一条文字触发）
 
 ## 约束
 
-Java 8；字段 `private final` + 构造器注入；单文件 ≤ 400 行 / 单方法 ≤ 60 行；
+Java 17；字段 `private final` + 构造器注入；单文件 ≤ 400 行 / 单方法 ≤ 60 行；
 统一 SLF4J，不打印 authToken；`mode/` 包零 SDK import（经 `ModeSender` 回发，子进程交互封装在 `claude/` 子包）。
