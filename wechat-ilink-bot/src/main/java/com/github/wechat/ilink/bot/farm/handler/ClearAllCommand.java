@@ -4,11 +4,18 @@ import com.github.wechat.ilink.bot.command.Command;
 import com.github.wechat.ilink.bot.command.CommandResult;
 import com.github.wechat.ilink.bot.farm.model.CropStage;
 import com.github.wechat.ilink.bot.farm.model.FarmPlot;
+import com.github.wechat.ilink.bot.persistence.ActionRankRepository;
 import com.github.wechat.ilink.bot.session.PlayerSession;
 
 import java.util.List;
 
 public class ClearAllCommand implements Command {
+
+    private final ActionRankRepository rankRepo;
+
+    public ClearAllCommand(ActionRankRepository rankRepo) {
+        this.rankRepo = rankRepo;
+    }
 
     @Override
     public String name() { return "CLEAR_ALL"; }
@@ -31,6 +38,7 @@ public class ClearAllCommand implements Command {
             return CommandResult.error("没有枯萎的作物需要清理");
         }
 
+        rankRepo.incrementScore("WEED", session.getUserId(), cleared);
         return CommandResult.success("🧹 清理完成！清除了 " + cleared + " 块枯萎作物");
     }
 }

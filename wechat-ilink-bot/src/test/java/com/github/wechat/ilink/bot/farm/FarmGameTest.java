@@ -42,9 +42,9 @@ class FarmGameTest {
     }
 
     @Test
-    void registerCommands_registers19Commands() {
+    void registerCommands_registersAllCommands() {
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
-        FarmGame farmGame = new FarmGame(registry, rankRepo, qrCodeProvider);
+        FarmGame farmGame = new FarmGame(registry, rankRepo, dbManager, qrCodeProvider);
         farmGame.registerCommands();
 
         assertNotNull(registry.find("USER_INFO"));
@@ -62,21 +62,26 @@ class FarmGameTest {
         assertNotNull(registry.find("WATER_ALL"));
         assertNotNull(registry.find("PEST_ALL"));
         assertNotNull(registry.find("FERTILIZE"));
-        assertNotNull(registry.find("STEAL_CHECK"));
+        assertNotNull(registry.find("RENAME"));
+        assertNotNull(registry.find("STEAL"));
         assertNotNull(registry.find("PEST_RANK"));
         assertNotNull(registry.find("WEED_RANK"));
         assertNotNull(registry.find("WATER_RANK"));
+        assertNotNull(registry.find("WEALTH_RANK"));
+        assertNotNull(registry.find("LEVEL_RANK"));
+        assertNotNull(registry.find("STEAL_RANK"));
+        assertNotNull(registry.find("RANK_MENU"));
         assertNotNull(registry.find("HELP"));
         assertNotNull(registry.find("BUY_SEED"));
         assertNotNull(registry.find("SHARE"));
 
-        assertEquals(22, registry.allCommands().size());
+        assertEquals(27, registry.allCommands().size());
     }
 
     @Test
     void registerCommands_registersChineseAliases() {
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
-        FarmGame farmGame = new FarmGame(registry, rankRepo, qrCodeProvider);
+        FarmGame farmGame = new FarmGame(registry, rankRepo, dbManager, qrCodeProvider);
         farmGame.registerCommands();
 
         assertEquals("USER_INFO", registry.resolveAlias("我的信息"));

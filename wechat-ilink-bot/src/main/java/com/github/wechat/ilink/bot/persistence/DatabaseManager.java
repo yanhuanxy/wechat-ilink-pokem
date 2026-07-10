@@ -83,6 +83,17 @@ public class DatabaseManager {
                     "updated_at TEXT NOT NULL," +
                     "PRIMARY KEY (action_type, user_id))");
 
+            // 偷菜记录：记"某玩家某地某成熟周期被某贼偷走多少"。planted_at 区分作物轮次；
+            // 收获时按 (victim_id, plot_index) 清理。全字段 PK 保证同一贼对同一地同一轮只能偷一次。
+            stmt.execute("CREATE TABLE IF NOT EXISTS steal_record (" +
+                    "victim_id TEXT NOT NULL," +
+                    "plot_index INTEGER NOT NULL," +
+                    "planted_at TEXT NOT NULL," +
+                    "thief_id TEXT NOT NULL," +
+                    "amount INTEGER NOT NULL DEFAULT 0," +
+                    "stolen_at TEXT NOT NULL," +
+                    "PRIMARY KEY (victim_id, plot_index, planted_at, thief_id))");
+
             stmt.execute("CREATE TABLE IF NOT EXISTS claude_sessions (" +
                     "session_id TEXT PRIMARY KEY," +
                     "user_id TEXT NOT NULL," +
@@ -110,8 +121,10 @@ public class DatabaseManager {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_inventory_user ON inventory(user_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_action_rank_type ON action_rank(action_type, score DESC)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_claude_sessions_user ON claude_sessions(user_id, updated_at DESC)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_steal_victim ON steal_record(victim_id)");
 
             migratePlayerBotMode(stmt);
+            migratePlayerNickname(stmt);
         }
     }
 
@@ -138,10 +151,21 @@ public class DatabaseManager {
     }
 
     private boolean hasPlayerBotModeColumn(Statement stmt) throws SQLException {
+        return hasPlayerColumn(stmt, "bot_mode");
+    }
+
+    private void migratePlayerNickname(Statement stmt) throws SQLException {
+        if (hasPlayerColumn(stmt, "nickname")) {
+            return;
+        }
+        stmt.execute("ALTER TABLE player ADD COLUMN nickname TEXT");
+        log.info("已迁移 player 表：新增 nickname 列");
+    }
+
+    private boolean hasPlayerColumn(Statement stmt, String column) throws SQLException {
         try (java.sql.ResultSet rs = stmt.executeQuery("PRAGMA table_info(player)")) {
             while (rs.next()) {
-                String name = rs.getString("name");
-                if ("bot_mode".equalsIgnoreCase(name)) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
                     return true;
                 }
             }

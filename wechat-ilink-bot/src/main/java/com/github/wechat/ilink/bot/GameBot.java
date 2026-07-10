@@ -65,7 +65,7 @@ public class GameBot implements OnMessageListener, ModeSender, MediaDownloader {
         this(engine, renderer, llmProvider, chatHistory, sessions,
                 streamingEnabled, typingIntervalMs, llmQueue, taskHandler,
                 claudeMode, claudeSessionRepo, null, null, new ReliabilityConfig(),
-                Collections.<String>emptySet(), null);
+                Collections.<String>emptySet(), null, false);
     }
 
     public GameBot(GameEngine engine, ResponseRenderer renderer,
@@ -76,7 +76,7 @@ public class GameBot implements OnMessageListener, ModeSender, MediaDownloader {
                    ClaudeSessionRepository claudeSessionRepo,
                    McpClient mcpClient, McpToolRegistry mcpToolRegistry,
                    ReliabilityConfig reliability, Set<String> claudeAdminUsers,
-                   MessageDedupRepository dedup) {
+                   MessageDedupRepository dedup, boolean adminDefaultPrivileged) {
         this.engine = engine;
         this.renderer = renderer;
         this.dedup = dedup;
@@ -104,7 +104,7 @@ public class GameBot implements OnMessageListener, ModeSender, MediaDownloader {
         this.router = new ModeRouter(ctx,
                 new ChatMode(),
                 new FarmMode(),
-                new SystemCommandMode(claudeAdminUsers),
+                new SystemCommandMode(claudeAdminUsers, adminDefaultPrivileged),
                 new ReviewMode(taskHandler),
                 claudeMode,
                 autogameMode);

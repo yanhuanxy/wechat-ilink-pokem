@@ -23,10 +23,10 @@ public class HelpCommand implements Command {
         sb.append("🌴✨#种植 小麦  #收获✨🌴\n");
         sb.append("🌴✨#卖菜      #锄地✨🌴\n");
         sb.append("🌴✨#浇水      #除虫✨🌴\n");
-        sb.append("🌴✨#施肥 小麦  偷菜(开发中)✨🌴\n");
-        sb.append("🌴✨#点券商店  #施肥 小麦✨🌴\n");
-        sb.append("🌴✨#驱虫排行  #除草排行✨🌴\n");
-        sb.append("🌴✨#浇水排行  #帮助✨🌴\n");
+        sb.append("🌴✨#施肥 小麦  #点券商店✨🌴\n");
+        sb.append("🌴✨#改名 昵称  #偷菜✨🌴\n");
+        sb.append("🌴✨#排行      #财富榜✨🌴\n");
+        sb.append("🌴✨#等级榜    #偷菜榜✨🌴\n");
         sb.append("🌴✨#分享      #邀请✨🌴\n");
         sb.append("╰ 🐛┈┈┈┈┈┈┈┈┈🐛╯");
         return CommandResult.success(sb.toString());

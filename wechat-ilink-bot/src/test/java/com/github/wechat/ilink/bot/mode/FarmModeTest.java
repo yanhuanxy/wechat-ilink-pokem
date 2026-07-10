@@ -41,7 +41,7 @@ class FarmModeTest {
         sessionManager = new SessionManager(dbManager);
         CommandRegistry registry = new CommandRegistry();
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
-        new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        new FarmGame(registry, rankRepo, dbManager, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return "qr"; }
         }).registerCommands();

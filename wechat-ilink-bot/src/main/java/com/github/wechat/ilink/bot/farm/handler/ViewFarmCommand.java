@@ -5,11 +5,18 @@ import com.github.wechat.ilink.bot.command.CommandResult;
 import com.github.wechat.ilink.bot.farm.model.CropRegistry;
 import com.github.wechat.ilink.bot.farm.model.CropStage;
 import com.github.wechat.ilink.bot.farm.model.FarmPlot;
+import com.github.wechat.ilink.bot.persistence.StealRecordRepository;
 import com.github.wechat.ilink.bot.session.PlayerSession;
 
 import java.util.List;
 
 public class ViewFarmCommand implements Command {
+
+    private final StealRecordRepository stealRepo;
+
+    public ViewFarmCommand(StealRecordRepository stealRepo) {
+        this.stealRepo = stealRepo;
+    }
 
     @Override
     public String name() { return "VIEW_FARM"; }
@@ -20,6 +27,7 @@ public class ViewFarmCommand implements Command {
     @Override
     public CommandResult execute(PlayerSession session, String[] args) {
         List<FarmPlot> activePlots = session.getActivePlots();
+        com.github.wechat.ilink.bot.farm.model.CropGrowth.refreshAll(activePlots);
         StringBuilder sb = new StringBuilder();
         sb.append("🌾 帮帮农场 - 我的土地\n");
 
@@ -36,6 +44,10 @@ public class ViewFarmCommand implements Command {
 
         sb.append("💰 金币: ").append(session.getGold())
                 .append(" 📦 种子: ").append(session.getInventory().totalSeedCount());
+        int stolen = stealRepo.sumStolenByVictim(session.getUserId());
+        if (stolen > 0) {
+            sb.append("\n🕵️ 提醒：你有 ").append(stolen).append(" 个作物已被偷（收获时少收）");
+        }
         return CommandResult.success(sb.toString());
     }
 

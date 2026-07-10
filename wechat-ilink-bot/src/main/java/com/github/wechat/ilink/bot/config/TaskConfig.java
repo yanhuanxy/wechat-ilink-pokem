@@ -60,6 +60,9 @@ public class TaskConfig {
     private List<String> claudeAdminUsers;
     // 自动压缩阈值：0=关闭；>0 表示每会话累计 N 轮对话后，下一条消息前自动跑一次 /compact 压缩上下文。
     private int claudeBridgeCompactThreshold;
+    // 管理员默认提权：true 时白名单内 admin 进入 CLAUDE 模式即默认提权档，省去开场 /sudo on。
+    // 默认 false（对现状零影响）；提权仍为 transient，/sudo off 或重启回收。
+    private boolean claudeBridgeAdminDefaultPrivileged;
 
     public TaskConfig() {
         this.enabled = false;
@@ -99,6 +102,7 @@ public class TaskConfig {
         this.claudeBridgePrivilegedMode = "bypassPermissions";
         this.claudeAdminUsers = new ArrayList<String>();
         this.claudeBridgeCompactThreshold = 0;
+        this.claudeBridgeAdminDefaultPrivileged = false;
     }
 
     public static TaskConfig load(String filePath) {
@@ -206,4 +210,6 @@ public class TaskConfig {
     public void setClaudeAdminUsers(List<String> claudeAdminUsers) { this.claudeAdminUsers = claudeAdminUsers; }
     public int getClaudeBridgeCompactThreshold() { return claudeBridgeCompactThreshold; }
     public void setClaudeBridgeCompactThreshold(int claudeBridgeCompactThreshold) { this.claudeBridgeCompactThreshold = claudeBridgeCompactThreshold; }
+    public boolean isClaudeBridgeAdminDefaultPrivileged() { return claudeBridgeAdminDefaultPrivileged; }
+    public void setClaudeBridgeAdminDefaultPrivileged(boolean claudeBridgeAdminDefaultPrivileged) { this.claudeBridgeAdminDefaultPrivileged = claudeBridgeAdminDefaultPrivileged; }
 }

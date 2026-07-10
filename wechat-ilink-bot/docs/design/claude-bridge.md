@@ -65,6 +65,8 @@ handleText(ctx, session, text)
 
 ## 权限三档与工作空间隔离
 
+> **最终权限模型为二元制**（受限只读 / admin 提权 bypass）。逐次工具交互审批（`--permission-prompt-tool`）**已决策不做**（NO-GO，见 [claude-bridge-phase3.2-spike.md](claude-bridge-phase3.2-spike.md) 决策更新）：对已能提权者不增安全、只添脆弱面，且远程侧损效率。下述 `plan`/`approve` 为**可选只读评审**入口，非必经路径；真正的低摩擦提权是 admin 的 `/sudo` 逐会话档。
+
 子进程**默认受限**；`/plan on` 切只读计划档产出方案文本；`/sudo on`（管理员）/`/approve`（管理员）切提权档执行。三档由 `PlayerSession` 的 transient 标志（`claudePrivileged` / `claudePlanMode`）切换，`ClaudeCodeAdapter.buildArgs` 按优先级 **bypass > plan > default** 分发：
 
 | 档 | 触发 | `--permission-mode` | 工具策略 | 子进程 cwd |
@@ -76,6 +78,7 @@ handleText(ctx, session, text)
 - **工作空间隔离**：`ClaudeCodeAdapter.run` 以 `Paths.get(cwd, BridgeWorkspace.sanitize(userId))` 为子进程 cwd；受限档与 plan 档均为只读白名单、无 `--add-dir`，工作目录之外不可达 → **用户 A 读不到用户 B 的内容**。`/resume` 经 `SystemCommandMode.resolveSession` 按 `userId` 校验归属，且各用户 cwd 不同（claude 按 cwd 分目录存会话），跨用户续传亦不可行。
 - plan 档只读（与 default 同安全级），故 `/plan`、`/approve` 对所有用户开放；提权档绕过工具与目录限制（可管控宿主机），故 `/sudo` 仅对 `claudeAdminUsers` 白名单内的 userId 可见、可用，非白名单命中即当作未知命令，不暴露该指令存在。
 - 三档均为 transient：重启或对应 off 命令回收，默认回到受限。
+- **管理员默认提权（opt-in）**：`claudeBridgeAdminDefaultPrivileged=true` 时，白名单内 admin 经 `/mode claude` 进入 CLAUDE 模式即在 `SystemCommandMode.handleMode` 中默认切提权档，省去开场 `/sudo on`（远程效率）。默认 `false`（对现状零影响）；提权仍为 transient，`/sudo off` 或重启回收。**已知限制**：重启后若持久 `bot_mode=CLAUDE` 被直接恢复（未再经 `/mode claude`），不自动提权，需重新进入模式或 `/sudo on`——刻意从严。
 - **提权档在 headless `-p` 下必须额外带 `--dangerously-skip-permissions`**（P0 修复）：`--permission-mode bypassPermissions` 单独不够——进入 bypass 仍要一次危险模式确认，非交互环境无法预接受，claude 会静默跑在受限等效档、Write/Edit/Bash 被收走（提权形同虚设，实测根因）。该 flag 等价于宿主 `~/.claude/settings.json` 的 `skipDangerousModePermissionPrompt: true`（宿主交互式 bypass 能用的原因）；子进程配置目录被隔离、读不到宿主那份，故必须在 argv 显式下发。
 
 ### plan → approve → 执行 闭环
@@ -140,12 +143,13 @@ compactThreshold > 0 && 非新会话 && 有 resumeSessionId && session.getClaude
 | `claudeBridgePrivilegedMode` | `bypassPermissions` | 提权档（`/sudo on` 或 `/approve`）`--permission-mode` |
 | `claudeAdminUsers` | `[]` | 可执行 `/sudo` 提权的微信 userId 白名单；空=无人可提权 |
 | `claudeBridgeCompactThreshold` | `0` | 自动压缩阈值；`0`=关闭，`>0`=每会话累计 N 轮后下一条消息前自动 `/compact` |
+| `claudeBridgeAdminDefaultPrivileged` | `false` | `true` 时白名单内 admin 经 `/mode claude` 进入即默认提权档，省去开场 `/sudo on`；提权仍为 transient，`/sudo off` 或重启回收 |
 
 > 注：`permissionMode` / `allowedTools` / `disallowedTools`（无 `claudeBridge` 前缀）是已移除的 Claude Code 视频点评流程遗留的工具策略字段；Review 现走 `DashScopeVideoProvider` 直连、不经 claude 子进程工具策略。Bridge 的工具策略由上表 `claudeBridge*` 字段控制。
 
 > **工具策略（Phase 3）**：Bridge 由 `ClaudeCodeAdapter.appendBridgePolicy` 把 `claudeBridgeAllowedTools` / `claudeBridgeDisallowedTools`
 > 拼到子进程参数（`--permission-mode` 之后）。**白名单仅在非 `bypassPermissions` 模式下生效**；两列表默认空，行为与今日一致（opt-in）。
-> 逐次交互审批留待 Phase 3.2——已 spike 确认可行（见 [claude-bridge-phase3.2-spike.md](claude-bridge-phase3.2-spike.md)）。
+> 逐次交互审批（Phase 3.2）**已决策不做**（NO-GO，见 [claude-bridge-phase3.2-spike.md](claude-bridge-phase3.2-spike.md)）；权限收敛为二元制。
 
 `claude_sessions` 表始终建好、`ClaudeSessionRepository` 始终可用，与 adapter 是否启用无关。
 

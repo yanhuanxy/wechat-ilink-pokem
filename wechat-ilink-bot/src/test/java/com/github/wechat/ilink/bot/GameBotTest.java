@@ -57,7 +57,7 @@ class GameBotTest {
         sessionManager = new SessionManager(dbManager);
         CommandRegistry registry = new CommandRegistry();
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
-        new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        new FarmGame(registry, rankRepo, dbManager, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return "test-qr-data"; }
         }).registerCommands();
@@ -92,7 +92,7 @@ class GameBotTest {
 
         CommandRegistry registry = new CommandRegistry();
         ActionRankRepository rankRepo = new ActionRankRepository(db2);
-        new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        new FarmGame(registry, rankRepo, db2, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return "test-qr-data"; }
         }).registerCommands();
@@ -127,7 +127,7 @@ class GameBotTest {
 
         CommandRegistry registry = new CommandRegistry();
         ActionRankRepository rankRepo = new ActionRankRepository(db3);
-        new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        new FarmGame(registry, rankRepo, db3, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return "test-qr-data"; }
         }).registerCommands();
@@ -209,7 +209,7 @@ class GameBotTest {
         String testUrl = "https://liteapp.weixin.qq.com/q/test?qrcode=abc&bot_type=3";
         CommandRegistry registry = new CommandRegistry();
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
-        new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        new FarmGame(registry, rankRepo, dbManager, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return testUrl; }
         }).registerCommands();
@@ -375,7 +375,7 @@ class GameBotTest {
     private GameBot dedupBot(MessageDedupRepository dedup) {
         CommandRegistry registry = new CommandRegistry();
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
-        new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        new FarmGame(registry, rankRepo, dbManager, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return "test-qr-data"; }
         }).registerCommands();
@@ -383,7 +383,7 @@ class GameBotTest {
         GameEngine engine = new GameEngine(parser, sessionManager, registry);
         GameBot dedupBot = new GameBot(engine, new ResponseRenderer(), null, new ChatHistoryManager(20),
                 sessionManager, false, 5000, new LlmRequestQueue(3, 50), null, null, null,
-                null, null, new ReliabilityConfig(), Collections.<String>emptySet(), dedup);
+                null, null, new ReliabilityConfig(), Collections.<String>emptySet(), dedup, false);
         dedupBot.setClient(client);
         return dedupBot;
     }

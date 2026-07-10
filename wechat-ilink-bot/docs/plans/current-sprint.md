@@ -53,7 +53,7 @@
   Bridge 经 `ClaudeCodeAdapter.appendBridgePolicy` 落到 `--allowedTools` / `--disallowedTools`（Review 走 DashScopeVideoProvider 直连、不经工具策略）；opt-in 不破坏现有行为
   - 评估结论：headless 模式无文档化的逐次工具审批协议（`--permission-prompt-tool` 无规范、stream-json 控制协议为内部接口），
     叠加 DashScope 403 无法 live 验证 → 采用文档化稳定的静态策略路线
-  - 逐次交互审批（持久子进程 + ApprovalBuffer + ModeRouter 拦截 y/n）延后为 Phase 3.2，待 DashScope 充值后 spike
+  - Phase 3.2 逐次交互审批 —— ❌ **已决策不做（NO-GO，2026-07-09）**：`--permission-prompt-tool` 实为 MCP 工具名（需 JVM 反向做 MCP server）、schema/端点未验证、对已能提权者不增安全、远程损效率；权限收敛为二元制，另加 opt-in 旋钮 `claudeBridgeAdminDefaultPrivileged`（admin 进入即默认提权）。见 [claude-bridge-phase3.2-spike.md](../design/claude-bridge-phase3.2-spike.md) 决策更新
 - [x] Phase 4：双向文件回传（AES-128-ECB 解密 + CDN 上传）
   - [x] `MediaDownloader` seam（入向）+ `ModeSender` 增 `sendImage/sendFile/sendVideo`（出向）；`GameBot` 实现两者，委托 SDK（SDK 内部完成 CDN 下载/上传 + AES 解密）
   - [x] `BridgeFileBuffer`（per-user 60s 入向票据缓冲，仿 `VideoTaskBuffer`）+ `BridgeWorkspace`（`<cwd>/<userId>/{input,output}`，入向落盘 / 出向扫描）

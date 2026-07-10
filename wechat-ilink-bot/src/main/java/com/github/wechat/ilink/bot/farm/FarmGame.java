@@ -10,38 +10,55 @@ import com.github.wechat.ilink.bot.farm.handler.FarmBagCommand;
 import com.github.wechat.ilink.bot.farm.handler.FertilizeCommand;
 import com.github.wechat.ilink.bot.farm.handler.HarvestAllCommand;
 import com.github.wechat.ilink.bot.farm.handler.HelpCommand;
+import com.github.wechat.ilink.bot.farm.handler.LevelRankCommand;
 import com.github.wechat.ilink.bot.farm.handler.PestAllCommand;
 import com.github.wechat.ilink.bot.farm.handler.PestRankCommand;
 import com.github.wechat.ilink.bot.farm.handler.PlantAllCommand;
+import com.github.wechat.ilink.bot.farm.handler.RankMenuCommand;
+import com.github.wechat.ilink.bot.farm.handler.RenameCommand;
 import com.github.wechat.ilink.bot.farm.handler.SeedShopCommand;
 import com.github.wechat.ilink.bot.farm.handler.SellAllCommand;
 import com.github.wechat.ilink.bot.farm.handler.ShareCommand;
-import com.github.wechat.ilink.bot.farm.handler.StealCheckCommand;
+import com.github.wechat.ilink.bot.farm.handler.StealCommand;
+import com.github.wechat.ilink.bot.farm.handler.StealRankCommand;
 import com.github.wechat.ilink.bot.farm.handler.ToolBagCommand;
 import com.github.wechat.ilink.bot.farm.handler.UserInfoCommand;
 import com.github.wechat.ilink.bot.farm.handler.ViewFarmCommand;
 import com.github.wechat.ilink.bot.farm.handler.WaterAllCommand;
-
 import com.github.wechat.ilink.bot.farm.handler.WaterRankCommand;
+import com.github.wechat.ilink.bot.farm.handler.WealthRankCommand;
 import com.github.wechat.ilink.bot.farm.handler.WeatherCommand;
 import com.github.wechat.ilink.bot.farm.handler.WeedRankCommand;
+import com.github.wechat.ilink.bot.farm.service.StealService;
 import com.github.wechat.ilink.bot.persistence.ActionRankRepository;
+import com.github.wechat.ilink.bot.persistence.DatabaseManager;
+import com.github.wechat.ilink.bot.persistence.FarmPlotRepository;
+import com.github.wechat.ilink.bot.persistence.PlayerRepository;
+import com.github.wechat.ilink.bot.persistence.StealRecordRepository;
 
 public class FarmGame {
 
     private final CommandRegistry registry;
     private final ActionRankRepository rankRepo;
+    private final PlayerRepository playerRepo;
+    private final StealRecordRepository stealRepo;
     private final QrCodeProvider qrCodeProvider;
+    private final StealService stealService;
 
-    public FarmGame(CommandRegistry registry, ActionRankRepository rankRepo, QrCodeProvider qrCodeProvider) {
+    public FarmGame(CommandRegistry registry, ActionRankRepository rankRepo,
+                    DatabaseManager dbManager, QrCodeProvider qrCodeProvider) {
         this.registry = registry;
         this.rankRepo = rankRepo;
+        this.playerRepo = new PlayerRepository(dbManager);
+        this.stealRepo = new StealRecordRepository(dbManager);
         this.qrCodeProvider = qrCodeProvider;
+        this.stealService = new StealService(
+                new FarmPlotRepository(dbManager), playerRepo, stealRepo, rankRepo);
     }
 
     public void registerCommands() {
         registry.register(new UserInfoCommand());
-        registry.register(new ViewFarmCommand());
+        registry.register(new ViewFarmCommand(stealRepo));
         registry.register(new SeedShopCommand());
         registry.register(new BuySeedCommand());
         registry.register(new CouponShopCommand());
@@ -50,16 +67,21 @@ public class FarmGame {
         registry.register(new CheckinCommand());
         registry.register(new WeatherCommand());
         registry.register(new PlantAllCommand());
-        registry.register(new HarvestAllCommand());
+        registry.register(new HarvestAllCommand(stealRepo));
         registry.register(new SellAllCommand());
-        registry.register(new ClearAllCommand());
-        registry.register(new WaterAllCommand());
-        registry.register(new PestAllCommand());
+        registry.register(new ClearAllCommand(rankRepo));
+        registry.register(new WaterAllCommand(rankRepo));
+        registry.register(new PestAllCommand(rankRepo));
         registry.register(new FertilizeCommand());
-        registry.register(new StealCheckCommand());
-        registry.register(new PestRankCommand(rankRepo));
-        registry.register(new WeedRankCommand(rankRepo));
-        registry.register(new WaterRankCommand(rankRepo));
+        registry.register(new RenameCommand());
+        registry.register(new StealCommand(stealService));
+        registry.register(new PestRankCommand(rankRepo, playerRepo));
+        registry.register(new WeedRankCommand(rankRepo, playerRepo));
+        registry.register(new WaterRankCommand(rankRepo, playerRepo));
+        registry.register(new WealthRankCommand(playerRepo));
+        registry.register(new LevelRankCommand(playerRepo));
+        registry.register(new StealRankCommand(rankRepo, playerRepo));
+        registry.register(new RankMenuCommand());
         registry.register(new HelpCommand());
         registry.register(new ShareCommand(qrCodeProvider));
 
@@ -98,11 +120,25 @@ public class FarmGame {
         registry.registerAlias("一键除虫", "PEST_ALL");
         registry.registerAlias("除虫", "PEST_ALL");
         registry.registerAlias("施肥", "FERTILIZE");
-        registry.registerAlias("偷菜查询", "STEAL_CHECK");
-        registry.registerAlias("偷菜", "STEAL_CHECK");
+        registry.registerAlias("改名", "RENAME");
+        registry.registerAlias("昵称", "RENAME");
+        registry.registerAlias("起名", "RENAME");
+        registry.registerAlias("偷菜查询", "STEAL");
+        registry.registerAlias("偷菜", "STEAL");
+        registry.registerAlias("偷", "STEAL");
+        registry.registerAlias("排行", "RANK_MENU");
+        registry.registerAlias("排行榜", "RANK_MENU");
+        registry.registerAlias("财富榜", "WEALTH_RANK");
+        registry.registerAlias("财富排行", "WEALTH_RANK");
+        registry.registerAlias("金币榜", "WEALTH_RANK");
+        registry.registerAlias("等级榜", "LEVEL_RANK");
+        registry.registerAlias("等级排行", "LEVEL_RANK");
+        registry.registerAlias("偷菜榜", "STEAL_RANK");
+        registry.registerAlias("偷菜排行", "STEAL_RANK");
+        registry.registerAlias("大盗榜", "STEAL_RANK");
+        registry.registerAlias("浇水排行", "WATER_RANK");
         registry.registerAlias("驱虫", "PEST_RANK");
         registry.registerAlias("除草", "WEED_RANK");
-        registry.registerAlias("浇水排行", "WATER_RANK");
         registry.registerAlias("驱虫排行", "PEST_RANK");
         registry.registerAlias("除草排行", "WEED_RANK");
         registry.registerAlias("帮助", "HELP");

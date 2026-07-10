@@ -4,21 +4,44 @@ import com.github.wechat.ilink.bot.command.Command;
 import com.github.wechat.ilink.bot.command.CommandResult;
 import com.github.wechat.ilink.bot.farm.model.CropStage;
 import com.github.wechat.ilink.bot.farm.model.FarmPlot;
+import com.github.wechat.ilink.bot.persistence.ActionRankRepository;
+import com.github.wechat.ilink.bot.persistence.DatabaseManager;
+import com.github.wechat.ilink.bot.persistence.StealRecordRepository;
 import com.github.wechat.ilink.bot.session.PlayerSession;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class FarmCommandTest {
 
+    @TempDir
+    File tempDir;
+
     private PlayerSession session;
+    private DatabaseManager dbManager;
+    private ActionRankRepository rankRepo;
+    private StealRecordRepository stealRepo;
 
     @BeforeEach
     void setUp() {
         session = new PlayerSession("testUser");
+        dbManager = new DatabaseManager(new File(tempDir, "test.db").getAbsolutePath());
+        dbManager.initialize();
+        rankRepo = new ActionRankRepository(dbManager);
+        stealRepo = new StealRecordRepository(dbManager);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (dbManager != null) {
+            dbManager.close();
+        }
     }
 
     @Test
@@ -26,13 +49,14 @@ class FarmCommandTest {
         UserInfoCommand cmd = new UserInfoCommand();
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
-        assertTrue(result.getMessage().contains("testUser"));
+        // 无昵称时展示"农夫#<wxid尾号>"兜底名，而非裸 userId
+        assertTrue(result.getMessage().contains("农夫"));
         assertTrue(result.getMessage().contains("500"));
     }
 
     @Test
     void viewFarm_displaysEmptyFarm() {
-        ViewFarmCommand cmd = new ViewFarmCommand();
+        ViewFarmCommand cmd = new ViewFarmCommand(stealRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
         assertTrue(result.getMessage().contains("空地"));
@@ -70,12 +94,11 @@ class FarmCommandTest {
 
     @Test
     void harvestAll_matureCrops_harvests() {
-        session.getPlots().get(0).plant("wheat");
-        session.getPlots().get(0).setStage(CropStage.MATURE);
-        session.getPlots().get(1).plant("wheat");
-        session.getPlots().get(1).setStage(CropStage.MATURE);
+        // 成熟由时间驱动（CropGrowth 读时计算）：plantedAt 设为很久以前才会判成熟
+        plantMature(session.getPlots().get(0), "wheat");
+        plantMature(session.getPlots().get(1), "wheat");
 
-        HarvestAllCommand cmd = new HarvestAllCommand();
+        HarvestAllCommand cmd = new HarvestAllCommand(stealRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
         assertTrue(result.getMessage().contains("收获"));
@@ -85,7 +108,7 @@ class FarmCommandTest {
 
     @Test
     void harvestAll_noMature_returnsError() {
-        HarvestAllCommand cmd = new HarvestAllCommand();
+        HarvestAllCommand cmd = new HarvestAllCommand(stealRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertFalse(result.isSuccess());
     }
@@ -93,7 +116,7 @@ class FarmCommandTest {
     @Test
     void waterAll_watersPlantedCrops() {
         session.getPlots().get(0).plant("wheat");
-        WaterAllCommand cmd = new WaterAllCommand();
+        WaterAllCommand cmd = new WaterAllCommand(rankRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
         assertEquals(1, session.getPlots().get(0).getWaterCount());
@@ -120,7 +143,7 @@ class FarmCommandTest {
     void clearAll_withWithered_clearsPlots() {
         session.getPlots().get(0).plant("wheat");
         session.getPlots().get(0).setStage(CropStage.WITHERED);
-        ClearAllCommand cmd = new ClearAllCommand();
+        ClearAllCommand cmd = new ClearAllCommand(rankRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
         assertEquals(CropStage.EMPTY, session.getPlots().get(0).getStage());
@@ -170,7 +193,7 @@ class FarmCommandTest {
 
     @Test
     void pestAll_noPest_returnsError() {
-        PestAllCommand cmd = new PestAllCommand();
+        PestAllCommand cmd = new PestAllCommand(rankRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertFalse(result.isSuccess());
     }
@@ -179,7 +202,7 @@ class FarmCommandTest {
     void pestAll_withPest_clearsPest() {
         session.getPlots().get(0).plant("wheat");
         session.getPlots().get(0).setHasPest(true);
-        PestAllCommand cmd = new PestAllCommand();
+        PestAllCommand cmd = new PestAllCommand(rankRepo);
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
         assertFalse(session.getPlots().get(0).isHasPest());
@@ -225,10 +248,24 @@ class FarmCommandTest {
     }
 
     @Test
-    void stealCheck_notAvailable() {
-        StealCheckCommand cmd = new StealCheckCommand();
+    void steal_emptyPool_returnsFriendlyMessage() {
+        StealCommand cmd = new StealCommand(new com.github.wechat.ilink.bot.farm.service.StealService(
+                new com.github.wechat.ilink.bot.persistence.FarmPlotRepository(dbManager),
+                new com.github.wechat.ilink.bot.persistence.PlayerRepository(dbManager),
+                stealRepo, rankRepo));
         CommandResult result = cmd.execute(session, new String[0]);
         assertTrue(result.isSuccess());
+        assertTrue(result.getMessage().contains("没有可偷"));
+    }
+
+    @Test
+    void steal_byIndexWithoutListing_returnsError() {
+        StealCommand cmd = new StealCommand(new com.github.wechat.ilink.bot.farm.service.StealService(
+                new com.github.wechat.ilink.bot.persistence.FarmPlotRepository(dbManager),
+                new com.github.wechat.ilink.bot.persistence.PlayerRepository(dbManager),
+                stealRepo, rankRepo));
+        CommandResult result = cmd.execute(session, new String[]{"1"});
+        assertFalse(result.isSuccess());
     }
 
     @Test
@@ -344,5 +381,11 @@ class FarmCommandTest {
         CommandResult result = cmd.execute(session, new String[]{"麦"});
         assertTrue(result.isSuccess());
         assertEquals(1, session.getInventory().getSeedCount("wheat"));
+    }
+
+    /** 种下并把 plantedAt 拨到 epoch，使 CropGrowth 读时判定为成熟。 */
+    private static void plantMature(FarmPlot plot, String cropKey) {
+        plot.plant(cropKey);
+        plot.setPlantedAt(0L);
     }
 }

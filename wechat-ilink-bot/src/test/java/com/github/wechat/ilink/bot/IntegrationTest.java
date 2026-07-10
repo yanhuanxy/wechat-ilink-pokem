@@ -42,7 +42,7 @@ class IntegrationTest {
         renderer = new ResponseRenderer();
         ActionRankRepository rankRepo = new ActionRankRepository(dbManager);
 
-        FarmGame farmGame = new FarmGame(registry, rankRepo, new QrCodeProvider() {
+        FarmGame farmGame = new FarmGame(registry, rankRepo, dbManager, new QrCodeProvider() {
             @Override
             public String getQrCodeUrl() { return "test-data"; }
         });
@@ -79,10 +79,10 @@ class IntegrationTest {
         }
         assertTrue(planted > 0);
 
-        // Step 4: Force mature
+        // Step 4: Force mature（成熟由时间驱动，把 plantedAt 拨到 epoch 使 CropGrowth 判成熟）
         for (FarmPlot plot : afterPlant.getActivePlots()) {
             if (plot.getStage() == CropStage.SEED) {
-                plot.setStage(CropStage.MATURE);
+                plot.setPlantedAt(0L);
             }
         }
 
@@ -109,7 +109,7 @@ class IntegrationTest {
         assertTrue(checkinResponse.contains("签到成功"));
 
         String infoResponse = renderer.render(engine.dispatch(userId, "我的信息"));
-        assertTrue(infoResponse.contains("player1"));
+        assertTrue(infoResponse.contains("农夫")); // 无昵称展示"农夫#尾号"兜底
         assertTrue(infoResponse.contains("560"));
     }
 

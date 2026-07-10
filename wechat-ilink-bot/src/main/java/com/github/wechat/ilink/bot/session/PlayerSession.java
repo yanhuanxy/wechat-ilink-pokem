@@ -15,6 +15,7 @@ public class PlayerSession {
     private int level;
     private int maxPlots;
     private int coupon;
+    private String nickname;
     private String lastCheckin;
     private int checkinStreak;
     private List<FarmPlot> plots;
@@ -113,6 +114,15 @@ public class PlayerSession {
         this.dirty = true;
     }
 
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+        this.dirty = true;
+    }
+
     public String getLastCheckin() {
         return lastCheckin;
     }
@@ -178,6 +188,11 @@ public class PlayerSession {
 
     public void clearDirty() {
         this.dirty = false;
+    }
+
+    /** 直接改内存态（如偷菜给贼加产量）后无字段 setter 触发 dirty 时，显式标脏以确保刷盘。 */
+    public void markDirty() {
+        this.dirty = true;
     }
 
     public BotModeType getCurrentMode() {

@@ -16,7 +16,9 @@ public class UserInfoCommand implements Command {
     public CommandResult execute(PlayerSession session, String[] args) {
         int expNeeded = session.getLevel() * 100;
         StringBuilder sb = new StringBuilder();
-        sb.append("👤 玩家: ").append(session.getUserId()).append("\n");
+        sb.append("👤 玩家: ")
+                .append(com.github.wechat.ilink.bot.farm.FarmDisplay.name(session.getUserId(), session.getNickname()))
+                .append("\n");
         sb.append("💰 金币: ").append(session.getGold()).append("\n");
         sb.append("⭐ 等级: Lv.").append(session.getLevel())
                 .append(" (").append(session.getExp()).append("/").append(expNeeded).append(" EXP)\n");

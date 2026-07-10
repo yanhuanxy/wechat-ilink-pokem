@@ -207,6 +207,40 @@ class SystemCommandModeTest {
     }
 
     @Test
+    void handleMode_adminWithDefaultPrivileged_setsPrivileged() throws Exception {
+        SystemCommandMode adminMode = new SystemCommandMode(new HashSet<String>(Arrays.asList("admin1")), true);
+        PlayerSession session = sessionManager.getOrCreate("admin1");
+
+        adminMode.handleText(ctx, session, "/mode claude");
+
+        assertEquals(BotModeType.CLAUDE, session.getCurrentMode());
+        assertTrue(session.isClaudePrivileged(), "admin + 默认提权开关应进入模式即提权");
+        verify(sender).sendText(eq("admin1"), contains("无限制模式"));
+    }
+
+    @Test
+    void handleMode_nonAdminWithDefaultPrivileged_staysRestricted() throws Exception {
+        SystemCommandMode adminMode = new SystemCommandMode(new HashSet<String>(Arrays.asList("admin1")), true);
+        PlayerSession session = sessionManager.getOrCreate("guest");
+
+        adminMode.handleText(ctx, session, "/mode claude");
+
+        assertEquals(BotModeType.CLAUDE, session.getCurrentMode());
+        assertFalse(session.isClaudePrivileged(), "非管理员即便开关打开也不得默认提权");
+    }
+
+    @Test
+    void handleMode_flagOff_staysRestricted() throws Exception {
+        SystemCommandMode adminMode = new SystemCommandMode(new HashSet<String>(Arrays.asList("admin1")), false);
+        PlayerSession session = sessionManager.getOrCreate("admin1");
+
+        adminMode.handleText(ctx, session, "/mode claude");
+
+        assertEquals(BotModeType.CLAUDE, session.getCurrentMode());
+        assertFalse(session.isClaudePrivileged(), "开关关闭时 admin 仍为受限档（回归护栏）");
+    }
+
+    @Test
     void sudo_emptyAdminSet_neverEscalates() throws Exception {
         PlayerSession session = sessionManager.getOrCreate("anyone");
 

@@ -106,8 +106,8 @@ ModeRouter.route(msg):
   旗标，对 Bridge（`ClaudeCodeAdapter`）生效（Review 走 DashScope 直连、不经 claude 工具策略；共享 `TaskConfig`）。
   逗号拼接，模式如 `Read`、`Grep`、`Bash(git log:*)`、`WebFetch(domain:example.com)`。
   **仅在 `permissionMode != bypassPermissions` 时实际起作用**（bypass 会跳过几乎所有检查）。
-  两列表默认空 → 不追加旗标，行为与未配置一致（opt-in）。逐次交互审批为未来 Phase 3.2，
-  依赖未文档化的 stream-json 控制协议，暂未实现。
+  两列表默认空 → 不追加旗标，行为与未配置一致（opt-in）。逐次交互审批（Phase 3.2）
+  **已决策不做**（NO-GO，见 claude-bridge-phase3.2-spike.md 决策更新）；权限收敛为二元制。
 - 工作目录隔离：每任务一个子目录，Claude Code 无法 `--add-dir` 到父级
 - 视频大小上限 50MB（`TaskConfig.maxVideoBytes`，MVP 保护）
 

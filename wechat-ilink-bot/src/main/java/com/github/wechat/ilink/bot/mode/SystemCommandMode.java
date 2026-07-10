@@ -22,13 +22,20 @@ public class SystemCommandMode implements BotMode {
     private static final int SESSIONS_LIST_LIMIT = 10;
 
     private final Set<String> claudeAdminUsers;
+    // true 时白名单内 admin 进入 CLAUDE 模式即默认切提权档，省去开场 /sudo on（remote 效率）。默认 false。
+    private final boolean adminDefaultPrivileged;
 
     public SystemCommandMode() {
-        this(Collections.<String>emptySet());
+        this(Collections.<String>emptySet(), false);
     }
 
     public SystemCommandMode(Set<String> claudeAdminUsers) {
+        this(claudeAdminUsers, false);
+    }
+
+    public SystemCommandMode(Set<String> claudeAdminUsers, boolean adminDefaultPrivileged) {
         this.claudeAdminUsers = claudeAdminUsers;
+        this.adminDefaultPrivileged = adminDefaultPrivileged;
     }
 
     @Override
@@ -190,7 +197,14 @@ public class SystemCommandMode implements BotMode {
             log.error("保存会话失败, userId={}", userId, e);
         }
         if (target == BotModeType.CLAUDE) {
-            send(ctx, userId, "已切换到 Claude Bridge 模式，发送 /new 开始新会话，或 /sessions 查看历史会话。");
+            // 管理员默认提权（opt-in）：进入模式即切提权档，省去开场 /sudo on。提权为 transient，/sudo off 或重启回收。
+            boolean autoPrivileged = adminDefaultPrivileged && isAdmin(userId);
+            if (autoPrivileged) {
+                session.setClaudePrivileged(true);
+                session.setClaudePlanMode(false);   // 互斥：bypass 与 plan 不可并存
+            }
+            send(ctx, userId, "已切换到 Claude Bridge 模式，发送 /new 开始新会话，或 /sessions 查看历史会话。"
+                    + (autoPrivileged ? "\n🔓 已默认开启无限制模式（本会话生效）；用完请及时 /sudo off。" : ""));
         } else {
             send(ctx, userId, "已切换到 " + target.name().toLowerCase() + " 模式");
         }

@@ -185,7 +185,7 @@ public interface ModeSender {
 | Phase | 改动 | 状态 |
 |-------|------|------|
 | Phase 2 | `ClaudeBridgeMode`（`--resume` 续传 + `claude_sessions` 表 + `/new`/`/sessions`/`/resume`） | ✅ 已完成 |
-| Phase 3 | 工具审批走静态策略白名单（`TaskConfig.allowedTools/disallowedTools` + `permissionMode`）；逐次交互审批延后为 Phase 3.2 | ✅ 已完成（3.2 延后） |
+| Phase 3 | 工具审批走静态策略白名单（`TaskConfig.allowedTools/disallowedTools` + `permissionMode`）；逐次交互审批（3.2）**已决策不做**（NO-GO，权限收敛为二元制） | ✅ 已完成 |
 | Phase 4 | `ModeContext` 增 `MediaDownloader`（入向）+ `ModeSender` 增 `sendFile/sendVideo`（出向）+ `BridgeFileBuffer`/`BridgeWorkspace` | ✅ 已完成 |
 | Phase 5 | `ModeContext.sender` 经 `RetrySender` 装饰；`ModeRouter` 入口 `RateLimiter`；`McpHealthMonitor` 自愈；`FlushGate` + 锁下沉 | ✅ 已完成 |
 | autogame | `ModeContext` 增 `mcpClient`/`mcpToolRegistry`（14 参构造器），`ModeRouter` 增 `!` 路由 + `AutogameMode` | ✅ 已完成 |

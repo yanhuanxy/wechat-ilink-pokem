@@ -229,7 +229,8 @@ public class BotInstance {
 
         final GameBot bot = new GameBot(engine, renderer, llmProvider, chatHistory, sessionManager,
                 streamingEnabled, typingIntervalMs, llmQueue, taskHandler, claudeBuild.mode, claudeRepo,
-                mcpClient, mcpToolRegistry, reliability, claudeAdminUsers(taskConfig), dedupRepo);
+                mcpClient, mcpToolRegistry, reliability, claudeAdminUsers(taskConfig), dedupRepo,
+                adminDefaultPrivileged(taskConfig));
 
         ILinkConfig.Builder configBuilder = ILinkConfig.builder()
                 .connectTimeoutMs(35000)
@@ -274,7 +275,7 @@ public class BotInstance {
             taskHandler.setClient(client);
         }
 
-        FarmGame farmGame = new FarmGame(registry, rankRepo, qrCodeProvider);
+        FarmGame farmGame = new FarmGame(registry, rankRepo, dbManager, qrCodeProvider);
         farmGame.registerCommands();
 
         BotInstance instance = new BotInstance(config.getName(), client, bot,
@@ -319,7 +320,8 @@ public class BotInstance {
 
         final GameBot bot = new GameBot(engine, renderer, llmProvider, chatHistory, sessionManager,
                 streamingEnabled, typingIntervalMs, llmQueue, taskHandler, claudeBuild.mode, claudeRepo,
-                mcpClient, mcpToolRegistry, reliability, claudeAdminUsers(taskConfig), dedupRepo);
+                mcpClient, mcpToolRegistry, reliability, claudeAdminUsers(taskConfig), dedupRepo,
+                adminDefaultPrivileged(taskConfig));
 
         ILinkConfig clientConfig = ILinkConfig.builder()
                 .connectTimeoutMs(35000)
@@ -357,7 +359,7 @@ public class BotInstance {
             taskHandler.setClient(client);
         }
 
-        FarmGame farmGame = new FarmGame(registry, rankRepo, qrCodeProvider);
+        FarmGame farmGame = new FarmGame(registry, rankRepo, dbManager, qrCodeProvider);
         farmGame.registerCommands();
 
         String qrCodeUrl = client.executeLogin();
@@ -410,6 +412,11 @@ public class BotInstance {
             return new HashSet<String>();
         }
         return new HashSet<String>(taskConfig.getClaudeAdminUsers());
+    }
+
+    /** 管理员默认提权开关；taskConfig 为空时默认关闭。 */
+    private static boolean adminDefaultPrivileged(TaskConfig taskConfig) {
+        return taskConfig != null && taskConfig.isClaudeBridgeAdminDefaultPrivileged();
     }
 
     private void sendWelcomeIfNeeded() {
