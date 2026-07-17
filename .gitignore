@@ -52,6 +52,21 @@ CLAUDE.md
 # wechat-ilink-bot runtime config & secrets under data/
 # These are auto-generated templates / per-deployment state that carry API keys and bot tokens.
 /data/models-config.json
+/data/models-config-tmp.json
 /data/farm_game.db*
 /data/claude-workspace/
 /data/tasks/
+
+# Claude Code subprocess runtime state under data/claude-home/
+# (session transcripts, telemetry, backups — may contain user messages; only .claude/skills/ is tracked)
+/data/claude-home/.claude.json
+/data/claude-home/.last-cleanup
+/data/claude-home/backups/
+/data/claude-home/projects/
+/data/claude-home/sessions/
+/data/claude-home/session-env/
+/data/claude-home/telemetry/
+
+# Sibling independent git repos — not part of this workspace repo.
+# (wechat-ilink-imoney: 暂不纳入体系；autogame 保留链接但仓库独立)
+/wechat-ilink-imoney/
