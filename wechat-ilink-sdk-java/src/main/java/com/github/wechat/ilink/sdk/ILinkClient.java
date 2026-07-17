@@ -77,6 +77,10 @@ public class ILinkClient implements AutoCloseable {
      */
     private final Object pollLock = new Object();
 
+    /** Epoch millis of the last successful {@link UpdateService#poll}; 0 until the first success.
+     * Read by the liveness watchdog ({@link #checkLiveness}); written after each successful poll. */
+    private volatile long lastPollSuccessAt = 0L;
+
     public static ILinkClientBuilder builder() {
         return new ILinkClientBuilder();
     }
@@ -124,12 +128,26 @@ public class ILinkClient implements AutoCloseable {
             new HeartbeatService(
                 executorManager.scheduler(),
                 config.getHeartbeatIntervalMs(),
-                    () -> {
-                        if (!stateManager.isLoggedIn()) return;
-                        if (loginContext.get() == null) return;
-                        pollAndDispatchMessages();
-                    },
+                this::checkLiveness,
                 listenerRegistry);
+    }
+
+    /**
+     * Liveness watchdog run on each heartbeat tick. The consumer owns the receive loop (continuous
+     * long-poll), so the heartbeat no longer polls itself—doing so only spawned a redundant second
+     * poller competing for {@link #pollLock}. Instead it verifies a getupdates has succeeded within
+     * {@link ILinkConfig#getLivenessThresholdMs()}; a stale window throws so {@link HeartbeatService}
+     * reports {@code onHeartbeatFailure}. See docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md (P1).
+     */
+    private void checkLiveness() {
+        if (!stateManager.isLoggedIn()) return;
+        if (loginContext.get() == null) return;
+        long baseline = lastPollSuccessAt;
+        if (baseline == 0L) return; // no poll has completed yet—nothing to judge
+        long idle = System.currentTimeMillis() - baseline;
+        if (idle > config.getLivenessThresholdMs()) {
+            throw new ILinkException("liveness: no successful getupdates for " + idle + "ms");
+        }
     }
 
     public String executeLogin() {
@@ -170,21 +188,39 @@ public class ILinkClient implements AutoCloseable {
     }
 
     /**
-     * Single entry for long-poll: serializes {@link UpdateService#poll} per client; notifies {@link
-     * OnMessageListener} after releasing {@link #pollLock} so listeners can safely call {@link
-     * #getUpdates} (including from other threads) without deadlock.
+     * Single entry for long-poll: serializes {@link UpdateService#poll} per client, then hands the
+     * batch to the dispatch executor (off the poll thread) so listener processing never stalls the
+     * next poll and listeners can safely call {@link #getUpdates} without deadlock.
      */
     private List<WeixinMessage> pollAndDispatchMessages() throws IOException {
         final List<WeixinMessage> messages;
         synchronized (pollLock) {
             messages = updateService.poll(requireLogin());
         }
+        lastPollSuccessAt = System.currentTimeMillis();
         if (messages != null && !messages.isEmpty()) {
-            for (OnMessageListener l : listenerRegistry.getMessageListeners()) {
-                l.onMessages(messages);
-            }
+            dispatchMessages(messages);
         }
         return messages;
+    }
+
+    /**
+     * Notifies {@link OnMessageListener}s on the single-thread dispatch executor: decouples listener
+     * processing from the poll loop (a slow listener no longer delays the next poll) while preserving
+     * batch order. Each listener is isolated—one throwing listener neither aborts the rest nor
+     * surfaces as a heartbeat failure. See docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md.
+     */
+    private void dispatchMessages(final List<WeixinMessage> messages) {
+        executorManager.dispatchExecutor().execute(
+            () -> {
+                for (OnMessageListener l : listenerRegistry.getMessageListeners()) {
+                    try {
+                        l.onMessages(messages);
+                    } catch (RuntimeException e) {
+                        log.error("OnMessageListener threw during dispatch", e);
+                    }
+                }
+            });
     }
 
     public void sendText(String toUserId, String text) throws IOException {

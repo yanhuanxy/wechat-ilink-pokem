@@ -27,6 +27,7 @@ public final class ConfigLoader {
     setLong(p, "ilink.loginTimeoutMs", b::loginTimeoutMs);
     setBoolean(p, "ilink.heartbeatEnabled", b::heartbeatEnabled);
     setLong(p, "ilink.heartbeatIntervalMs", b::heartbeatIntervalMs);
+    setLong(p, "ilink.livenessThresholdMs", b::livenessThresholdMs);
     setInt(p, "ilink.reconnectMaxAttempts", b::reconnectMaxAttempts);
     setLong(p, "ilink.reconnectBaseDelayMs", b::reconnectBaseDelayMs);
     setLong(p, "ilink.reconnectMaxDelayMs", b::reconnectMaxDelayMs);

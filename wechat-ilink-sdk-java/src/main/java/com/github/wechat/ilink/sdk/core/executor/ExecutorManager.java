@@ -6,8 +6,21 @@ import java.util.concurrent.*;
 public class ExecutorManager implements AutoCloseable {
   private final ThreadPoolExecutor ioExecutor;
   private final ScheduledThreadPoolExecutor scheduler;
+  // Single-thread executor for OnMessageListener dispatch: decouples listener processing from the
+  // poll loop (a slow listener no longer stalls the next poll) while preserving message order.
+  // See docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md.
+  private final ExecutorService dispatchExecutor;
 
   public ExecutorManager(ILinkConfig config) {
+    dispatchExecutor =
+        Executors.newSingleThreadExecutor(
+            new ThreadFactory() {
+              public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "ilink-dispatch");
+                t.setDaemon(true);
+                return t;
+              }
+            });
     ioExecutor =
         new ThreadPoolExecutor(
             config.getIoCoreThreads(),
@@ -43,8 +56,13 @@ public class ExecutorManager implements AutoCloseable {
     return scheduler;
   }
 
+  public ExecutorService dispatchExecutor() {
+    return dispatchExecutor;
+  }
+
   public void close() {
     ioExecutor.shutdownNow();
     scheduler.shutdownNow();
+    dispatchExecutor.shutdownNow();
   }
 }

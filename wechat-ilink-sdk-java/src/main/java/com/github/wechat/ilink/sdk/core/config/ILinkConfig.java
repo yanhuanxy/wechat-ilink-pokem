@@ -11,6 +11,10 @@ public final class ILinkConfig {
   private final long loginTimeoutMs;
   private final boolean heartbeatEnabled;
   private final long heartbeatIntervalMs;
+  // Liveness watchdog threshold: heartbeat fires onHeartbeatFailure if no getupdates has succeeded
+  // within this window. Sized above one long-poll cycle (readTimeout) to avoid false positives on
+  // quiet channels. See docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md (P1).
+  private final long livenessThresholdMs;
 
   private final int ioCoreThreads;
   private final int ioMaxThreads;
@@ -36,6 +40,7 @@ public final class ILinkConfig {
     this.loginTimeoutMs = b.loginTimeoutMs;
     this.heartbeatEnabled = b.heartbeatEnabled;
     this.heartbeatIntervalMs = b.heartbeatIntervalMs;
+    this.livenessThresholdMs = b.livenessThresholdMs;
     this.reconnectMaxAttempts = b.reconnectMaxAttempts;
     this.reconnectBaseDelayMs = b.reconnectBaseDelayMs;
     this.reconnectMaxDelayMs = b.reconnectMaxDelayMs;
@@ -63,6 +68,7 @@ public final class ILinkConfig {
     private long loginTimeoutMs = 180000L;
     private boolean heartbeatEnabled = true;
     private long heartbeatIntervalMs = 30000L;
+    private long livenessThresholdMs = 90000L;
     private int reconnectMaxAttempts = 5;
     private long reconnectBaseDelayMs = 1000L;
     private long reconnectMaxDelayMs = 30000L;
@@ -121,6 +127,11 @@ public final class ILinkConfig {
 
     public Builder heartbeatIntervalMs(long v) {
       this.heartbeatIntervalMs = v;
+      return this;
+    }
+
+    public Builder livenessThresholdMs(long v) {
+      this.livenessThresholdMs = v;
       return this;
     }
 
@@ -217,6 +228,10 @@ public final class ILinkConfig {
 
   public long getHeartbeatIntervalMs() {
     return heartbeatIntervalMs;
+  }
+
+  public long getLivenessThresholdMs() {
+    return livenessThresholdMs;
   }
 
   public int getReconnectMaxAttempts() {
