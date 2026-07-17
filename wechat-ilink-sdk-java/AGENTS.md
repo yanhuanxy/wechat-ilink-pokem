@@ -74,8 +74,7 @@ sdk/
 |------|------|------|
 | `src/test/`（不存在） | **零测试**。JUnit 5 已声明未使用 | 新改动补测试；存量按触碰顺序补特征化测试 |
 | 全库缩进 | 2 空格与 4 空格混用（ILinkConfig/LoginService/MediaService 为 2 空格） | 改哪个文件跟哪个文件的现状，不做全库格式化 |
-| `ILinkConfig` 的 `reconnect*`/`autoReconnect` 字段 | 产品不支持自动重连（README FAQ 确认需手动重登），字段无效 | 勿基于它实现"自动重连"功能；清理需用户拍板 |
-| 少量注释 | 存在 `// 好像没用` 类存疑注释 | 遇到先核实再处置，勿默信 |
+| `ILinkConfig` 的 `reconnect*`/`autoReconnect` 字段 | 产品不支持自动重连，字段无效 | ✅ 已 `@Deprecated` 并移出 `ConfigLoader`（[ADR-0001](docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md) P3）；勿据此实现"自动重连" |
 
 ## 场景锚点（你要做什么 → 先看这个）
 

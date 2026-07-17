@@ -10,4 +10,4 @@
 
 | 编号 | 决策 | 状态 |
 |------|------|------|
-| [0001](0001-no-reactive-incremental-dispatch-decoupling.md) | 驳回 Reactive(Flux) 改造，采用增量式「分发解耦 + 自持接收循环」 | 🟡 部分生效（P0+P1 落地，P2–P3 规划） |
+| [0001](0001-no-reactive-incremental-dispatch-decoupling.md) | 驳回 Reactive(Flux) 改造，采用增量式「分发解耦 + 自持接收循环」 | 🟢 生效（P0/P1/P3 落地，P2 撤销） |
