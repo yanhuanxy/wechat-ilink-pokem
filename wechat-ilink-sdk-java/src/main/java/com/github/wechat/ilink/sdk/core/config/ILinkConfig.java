@@ -21,9 +21,9 @@ public final class ILinkConfig {
   private final int schedulerThreads;
   private final int queueCapacity;
   private final String channelVersion;
-  //  好像没用
   private final String routeTag;
-  //  好像不太适用
+  // Deprecated: 产品不支持自动重连，以下 reconnect* / autoReconnect 字段无效（见 ADR-0001 P3）。
+  // 保留仅为对外 API 兼容；勿据此实现"自动重连"功能。断线由消费方的接收循环自行处理。
   private final boolean autoReconnectEnabled;
   private final int reconnectMaxAttempts;
   private final long reconnectBaseDelayMs;
@@ -135,16 +135,22 @@ public final class ILinkConfig {
       return this;
     }
 
+    /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）；勿据此实现功能。 */
+    @Deprecated
     public Builder reconnectMaxAttempts(int v) {
       this.reconnectMaxAttempts = v;
       return this;
     }
 
+    /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）；勿据此实现功能。 */
+    @Deprecated
     public Builder reconnectBaseDelayMs(long v) {
       this.reconnectBaseDelayMs = v;
       return this;
     }
 
+    /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）；勿据此实现功能。 */
+    @Deprecated
     public Builder reconnectMaxDelayMs(long v) {
       this.reconnectMaxDelayMs = v;
       return this;
@@ -180,6 +186,8 @@ public final class ILinkConfig {
       return this;
     }
 
+    /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）；勿据此实现功能。 */
+    @Deprecated
     public Builder autoReconnectEnabled(boolean v) {
       this.autoReconnectEnabled = v;
       return this;
@@ -234,14 +242,20 @@ public final class ILinkConfig {
     return livenessThresholdMs;
   }
 
+  /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）。 */
+  @Deprecated
   public int getReconnectMaxAttempts() {
     return reconnectMaxAttempts;
   }
 
+  /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）。 */
+  @Deprecated
   public long getReconnectBaseDelayMs() {
     return reconnectBaseDelayMs;
   }
 
+  /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）。 */
+  @Deprecated
   public long getReconnectMaxDelayMs() {
     return reconnectMaxDelayMs;
   }
@@ -270,6 +284,8 @@ public final class ILinkConfig {
     return routeTag;
   }
 
+  /** @deprecated 产品不支持自动重连，此配置无效（见 ADR-0001 P3）。 */
+  @Deprecated
   public boolean isAutoReconnectEnabled() {
     return autoReconnectEnabled;
   }

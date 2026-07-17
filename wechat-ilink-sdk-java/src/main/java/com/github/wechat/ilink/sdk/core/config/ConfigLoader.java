@@ -28,16 +28,13 @@ public final class ConfigLoader {
     setBoolean(p, "ilink.heartbeatEnabled", b::heartbeatEnabled);
     setLong(p, "ilink.heartbeatIntervalMs", b::heartbeatIntervalMs);
     setLong(p, "ilink.livenessThresholdMs", b::livenessThresholdMs);
-    setInt(p, "ilink.reconnectMaxAttempts", b::reconnectMaxAttempts);
-    setLong(p, "ilink.reconnectBaseDelayMs", b::reconnectBaseDelayMs);
-    setLong(p, "ilink.reconnectMaxDelayMs", b::reconnectMaxDelayMs);
     setInt(p, "ilink.ioCoreThreads", b::ioCoreThreads);
     setInt(p, "ilink.ioMaxThreads", b::ioMaxThreads);
     setInt(p, "ilink.schedulerThreads", b::schedulerThreads);
     setInt(p, "ilink.queueCapacity", b::queueCapacity);
     setString(p, "ilink.channelVersion", b::channelVersion);
     setString(p, "ilink.routeTag", b::routeTag);
-    setBoolean(p, "ilink.autoReconnectEnabled", b::autoReconnectEnabled);
+    // reconnect* / autoReconnect: 产品不支持自动重连，已废弃（ADR-0001 P3），不再从配置加载。
     return b.build();
   }
 

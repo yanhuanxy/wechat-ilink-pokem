@@ -6,11 +6,13 @@ import com.github.wechat.ilink.sdk.core.context.GetUpdatesCursorStore;
 import com.github.wechat.ilink.sdk.core.context.ResumeContext;
 import com.github.wechat.ilink.sdk.core.exception.ILinkException;
 import com.github.wechat.ilink.sdk.core.exception.NotLoginException;
+import com.github.wechat.ilink.sdk.core.exception.SessionExpiredException;
 import com.github.wechat.ilink.sdk.core.executor.ExecutorManager;
 import com.github.wechat.ilink.sdk.core.http.BusinessApiClient;
 import com.github.wechat.ilink.sdk.core.http.HttpClientFacade;
 import com.github.wechat.ilink.sdk.core.lifecycle.HeartbeatService;
 import com.github.wechat.ilink.sdk.core.listener.ListenerRegistry;
+import com.github.wechat.ilink.sdk.core.listener.OnDisconnectListener;
 import com.github.wechat.ilink.sdk.core.listener.OnLoginListener;
 import com.github.wechat.ilink.sdk.core.listener.OnMessageListener;
 import com.github.wechat.ilink.sdk.core.login.LoginContext;
@@ -194,14 +196,36 @@ public class ILinkClient implements AutoCloseable {
      */
     private List<WeixinMessage> pollAndDispatchMessages() throws IOException {
         final List<WeixinMessage> messages;
-        synchronized (pollLock) {
-            messages = updateService.poll(requireLogin());
+        try {
+            synchronized (pollLock) {
+                messages = updateService.poll(requireLogin());
+            }
+        } catch (SessionExpiredException e) {
+            fireOnDisconnect(e);
+            throw e;
         }
         lastPollSuccessAt = System.currentTimeMillis();
         if (messages != null && !messages.isEmpty()) {
             dispatchMessages(messages);
         }
         return messages;
+    }
+
+    /**
+     * Notifies {@link OnDisconnectListener}s of a definitive disconnect (session expired). Pure
+     * notification—intentionally does NOT flip connection state / {@link #isLoggedIn()}, so a
+     * consumer's control flow keyed on isLoggedIn (and its cleanup path) is unaffected; the
+     * consumer's poll loop still surfaces the exception. Each listener is isolated.
+     * See docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md (P3).
+     */
+    private void fireOnDisconnect(Throwable cause) {
+        for (OnDisconnectListener l : listenerRegistry.getDisconnectListeners()) {
+            try {
+                l.onDisconnect(cause);
+            } catch (RuntimeException ex) {
+                log.error("OnDisconnectListener threw during onDisconnect", ex);
+            }
+        }
     }
 
     /**
