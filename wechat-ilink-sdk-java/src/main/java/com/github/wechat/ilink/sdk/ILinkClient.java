@@ -79,8 +79,9 @@ public class ILinkClient implements AutoCloseable {
      */
     private final Object pollLock = new Object();
 
-    /** Epoch millis of the last successful {@link UpdateService#poll}; 0 until the first success.
-     * Read by the liveness watchdog ({@link #checkLiveness}); written after each successful poll. */
+    /** Epoch millis of the last successful {@link UpdateService#poll}; armed to "now" when the
+     * heartbeat starts ({@link #startHeartbeat}) so a consumer that never polls still trips the
+     * watchdog. Read by {@link #checkLiveness}; written after each successful poll. */
     private volatile long lastPollSuccessAt = 0L;
 
     public static ILinkClientBuilder builder() {
@@ -119,8 +120,8 @@ public class ILinkClient implements AutoCloseable {
             contextPoolManager.restore(resumeContext.getConversationContexts());
         }
         initHeartbeat();
-        if (stateManager.isLoggedIn() && heartbeatService != null) {
-            heartbeatService.start();
+        if (stateManager.isLoggedIn()) {
+            startHeartbeat();
         }
     }
 
@@ -144,9 +145,8 @@ public class ILinkClient implements AutoCloseable {
     private void checkLiveness() {
         if (!stateManager.isLoggedIn()) return;
         if (loginContext.get() == null) return;
-        long baseline = lastPollSuccessAt;
-        if (baseline == 0L) return; // no poll has completed yet—nothing to judge
-        long idle = System.currentTimeMillis() - baseline;
+        // baseline is armed at startHeartbeat(), so "consumer never polled" also trips the watchdog.
+        long idle = System.currentTimeMillis() - lastPollSuccessAt;
         if (idle > config.getLivenessThresholdMs()) {
             throw new ILinkException("liveness: no successful getupdates for " + idle + "ms");
         }
@@ -162,27 +162,50 @@ public class ILinkClient implements AutoCloseable {
                 (ctx, ex) -> {
                     if (ex != null) {
                         stateManager.set(ConnectionStatus.DISCONNECTED);
-                        for (OnLoginListener l : listenerRegistry.getLoginListeners()) {
-                            l.onLoginFailure(ex);
-                        }
+                        fireOnLoginFailure(ex);
                         return;
                     }
                     stateManager.set(ConnectionStatus.LOGGED_IN);
+                    // 先启心跳再通知监听器：监听器抛异常不得让看门狗静默失效。
+                    startHeartbeat();
                     for (OnLoginListener l : listenerRegistry.getLoginListeners()) {
-                        l.onLoginSuccess(ctx);
-                    }
-                    if (heartbeatService != null) {
-                        heartbeatService.start();
+                        try {
+                            l.onLoginSuccess(ctx);
+                        } catch (RuntimeException e) {
+                            log.error("OnLoginListener threw during onLoginSuccess", e);
+                        }
                     }
                 });
             return response.getQrcodeImgContent();
         } catch (RuntimeException | IOException e) {
             stateManager.set(ConnectionStatus.DISCONNECTED);
-            for (OnLoginListener l : listenerRegistry.getLoginListeners()) {
-                l.onLoginFailure(e);
-            }
+            fireOnLoginFailure(e);
             throw new RuntimeException("start login failed", e);
         }
+    }
+
+    /** Notifies {@link OnLoginListener#onLoginFailure}; each listener is isolated. */
+    private void fireOnLoginFailure(Throwable cause) {
+        for (OnLoginListener l : listenerRegistry.getLoginListeners()) {
+            try {
+                l.onLoginFailure(cause);
+            } catch (RuntimeException e) {
+                log.error("OnLoginListener threw during onLoginFailure", e);
+            }
+        }
+    }
+
+    /**
+     * Arms the liveness watchdog before starting the heartbeat: a consumer that never runs its
+     * receive loop leaves {@link #lastPollSuccessAt} at 0, which previously kept the watchdog
+     * silent forever—the exact contract violation it should report.
+     */
+    private void startHeartbeat() {
+        if (heartbeatService == null) return;
+        if (lastPollSuccessAt == 0L) {
+            lastPollSuccessAt = System.currentTimeMillis();
+        }
+        heartbeatService.start();
     }
 
     public List<WeixinMessage> getUpdates() throws IOException {

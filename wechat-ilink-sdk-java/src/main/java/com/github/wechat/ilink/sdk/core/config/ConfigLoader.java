@@ -25,6 +25,7 @@ public final class ConfigLoader {
     setLong(p, "ilink.retryMaxDelayMs", b::retryMaxDelayMs);
     setBoolean(p, "ilink.retryJitterEnabled", b::retryJitterEnabled);
     setLong(p, "ilink.loginTimeoutMs", b::loginTimeoutMs);
+    setLong(p, "ilink.loginPollIntervalMs", b::loginPollIntervalMs);
     setBoolean(p, "ilink.heartbeatEnabled", b::heartbeatEnabled);
     setLong(p, "ilink.heartbeatIntervalMs", b::heartbeatIntervalMs);
     setLong(p, "ilink.livenessThresholdMs", b::livenessThresholdMs);

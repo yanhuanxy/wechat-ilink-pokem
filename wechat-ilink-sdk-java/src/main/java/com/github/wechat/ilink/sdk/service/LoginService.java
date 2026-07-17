@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class LoginService implements AutoCloseable {
@@ -21,6 +22,10 @@ public class LoginService implements AutoCloseable {
   private final ExecutorService pollingExecutor;
   private final AtomicReference<CompletableFuture<LoginContext>> currentLoginFuture =
       new AtomicReference<CompletableFuture<LoginContext>>();
+  // CompletableFuture.cancel(true) 不会中断 supplyAsync 里正在执行的任务，轮询循环必须靠
+  // 这个显式取消标志退出；每次 startLoginPolling 持有一个新标志。
+  private final AtomicReference<AtomicBoolean> currentCancelFlag =
+      new AtomicReference<AtomicBoolean>();
 
   public LoginService(
       ILinkConfig config,
@@ -49,11 +54,12 @@ public class LoginService implements AutoCloseable {
     cancelCurrentLogin();
     loginStatus.reset();
     loginStatus.toWaiting();
+    final AtomicBoolean cancelled = new AtomicBoolean(false);
     CompletableFuture<LoginContext> future =
         CompletableFuture.supplyAsync(
                 () -> {
                   long deadline = System.currentTimeMillis() + config.getLoginTimeoutMs();
-                  while (!Thread.currentThread().isInterrupted()) {
+                  while (!cancelled.get() && !Thread.currentThread().isInterrupted()) {
                     if (System.currentTimeMillis() > deadline) {
                       loginStatus.toError("login timeout");
                       throw new ConnectFailedException("login timeout");
@@ -71,9 +77,13 @@ public class LoginService implements AutoCloseable {
                       r.setBotId((String) m.get("ilink_bot_id"));
                       r.setUserId((String) m.get("ilink_user_id"));
                       r.setBaseUrl((String) m.get("baseurl"));
-                      if (r.isWaiting()) continue;
+                      if (r.isWaiting()) {
+                        sleepPollInterval();
+                        continue;
+                      }
                       if (r.isScanned()) {
                         loginStatus.toScanned();
+                        sleepPollInterval();
                         continue;
                       }
                       if (r.isExpired()) {
@@ -95,13 +105,27 @@ public class LoginService implements AutoCloseable {
                   throw new ConnectFailedException("login cancelled");
                 },
             pollingExecutor);
+    currentCancelFlag.set(cancelled);
     currentLoginFuture.set(future);
     return future;
   }
 
   public void cancelCurrentLogin() {
+    AtomicBoolean flag = currentCancelFlag.getAndSet(null);
+    if (flag != null) flag.set(true);
     CompletableFuture<LoginContext> old = currentLoginFuture.getAndSet(null);
     if (old != null && !old.isDone()) old.cancel(true);
+  }
+
+  /** 两次 get_qrcode_status 之间的间隔：接口即时返回，无间隔会打成热循环。被中断即保留中断位返回，由循环条件退出。 */
+  private void sleepPollInterval() {
+    long ms = config.getLoginPollIntervalMs();
+    if (ms <= 0) return;
+    try {
+      Thread.sleep(ms);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   public void close() {

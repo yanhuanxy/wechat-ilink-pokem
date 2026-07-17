@@ -190,6 +190,8 @@ for (WeixinMessage msg : messages) {
 > ```
 >
 > 拉取到的消息经 `OnMessageListener.onMessages(...)` 异步回调（在 SDK 的单线程 dispatch 派发，见下）。**SDK 的心跳不再代收消息**（自 3.x 起心跳只做 liveness 探测）——因此不跑上面这个循环的话，注册了 `OnMessageListener` 也收不到任何消息。设计依据见 `docs/adr/0001`。
+>
+> **投递语义为 at-most-once**：游标在 `getUpdates()` 返回时即推进，监听器抛异常（仅记日志）或 `close()` 时 dispatch 队列未消费完的消息**不会重放**。需要不丢消息的业务，请在监听器内自行落地后再做耗时处理。另注意：发送类 API 走 HTTP 重试，若请求已达服务端而响应丢失，重试可能造成**重复发送**（协议无幂等键）。
 
 ---
 
@@ -430,6 +432,7 @@ SDK 通过 `ILinkConfig` 统一管理客户端参数，包括但不限于：
 - 最大退避时间
 - 是否启用抖动
 - 登录超时
+- 登录二维码状态轮询间隔（`loginPollIntervalMs`，默认 1500ms）
 - 心跳间隔
 - 是否启用心跳
 - 线程池参数

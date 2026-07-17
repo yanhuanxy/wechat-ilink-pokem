@@ -16,7 +16,7 @@
 | HTTP | okhttp 4.12.0 | 唯一 HTTP 客户端 |
 | JSON | jackson-databind 2.17.2 | DTO 序列化（snake_case 字段） |
 | 日志 | slf4j-api 2.0.13 + logback (runtime) | 统一 SLF4J |
-| 测试 | JUnit Jupiter 5.10（已声明，**当前零测试**） | 见「已知债」 |
+| 测试 | JUnit Jupiter 5.10（覆盖极薄，仅首批特征化测试） | 见「已知债」 |
 
 **禁止**：Spring、DI 框架、Lombok（全部手写 getter/setter/Builder）。`<build>` 无自定义插件，走 Maven 默认。
 
@@ -72,7 +72,8 @@ sdk/
 
 | 位置 | 债务 | 处置 |
 |------|------|------|
-| `src/test/`（不存在） | **零测试**。JUnit 5 已声明未使用 | 新改动补测试；存量按触碰顺序补特征化测试 |
+| `src/test/` | **测试覆盖极薄**：仅 5 个特征化测试（登录轮询间隔/取消、心跳监听器隔离、liveness 看门狗），其余存量无测试 | 新改动补测试；存量按触碰顺序补特征化测试 |
+| `ExecutorManager` dispatch 队列 | 无界队列，持续过载可堆积 | 明确搁置（[ADR-0001](docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md) 影响段）；若过载成真用有界队列+CallerRunsPolicy，勿引入 Reactor |
 | 全库缩进 | 2 空格与 4 空格混用（ILinkConfig/LoginService/MediaService 为 2 空格） | 改哪个文件跟哪个文件的现状，不做全库格式化 |
 | `ILinkConfig` 的 `reconnect*`/`autoReconnect` 字段 | 产品不支持自动重连，字段无效 | ✅ 已 `@Deprecated` 并移出 `ConfigLoader`（[ADR-0001](docs/adr/0001-no-reactive-incremental-dispatch-decoupling.md) P3）；勿据此实现"自动重连" |
 
@@ -94,7 +95,7 @@ sdk/
 
 ```powershell
 mvn clean package        # 构建（无 shade，产出普通 jar）
-mvn test                 # 跑测试（当前零测试，秒过；新测试写在 src/test/java 镜像包）
+mvn test                 # 跑测试（新测试写在 src/test/java 镜像包）
 mvn install              # 装入本地仓库供 bot/imoney 引用
 ```
 

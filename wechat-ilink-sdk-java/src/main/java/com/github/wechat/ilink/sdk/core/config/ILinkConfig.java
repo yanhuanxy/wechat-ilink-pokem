@@ -9,6 +9,8 @@ public final class ILinkConfig {
   private final long retryMaxDelayMs;
   private final boolean retryJitterEnabled;
   private final long loginTimeoutMs;
+  // 登录二维码状态轮询的两次请求间隔：get_qrcode_status 为即时返回接口，无间隔会打成热循环。
+  private final long loginPollIntervalMs;
   private final boolean heartbeatEnabled;
   private final long heartbeatIntervalMs;
   // Liveness watchdog threshold: heartbeat fires onHeartbeatFailure if no getupdates has succeeded
@@ -38,6 +40,7 @@ public final class ILinkConfig {
     this.retryMaxDelayMs = b.retryMaxDelayMs;
     this.retryJitterEnabled = b.retryJitterEnabled;
     this.loginTimeoutMs = b.loginTimeoutMs;
+    this.loginPollIntervalMs = b.loginPollIntervalMs;
     this.heartbeatEnabled = b.heartbeatEnabled;
     this.heartbeatIntervalMs = b.heartbeatIntervalMs;
     this.livenessThresholdMs = b.livenessThresholdMs;
@@ -66,6 +69,7 @@ public final class ILinkConfig {
     private long retryMaxDelayMs = 10000L;
     private boolean retryJitterEnabled = true;
     private long loginTimeoutMs = 180000L;
+    private long loginPollIntervalMs = 1500L;
     private boolean heartbeatEnabled = true;
     private long heartbeatIntervalMs = 30000L;
     private long livenessThresholdMs = 90000L;
@@ -117,6 +121,11 @@ public final class ILinkConfig {
 
     public Builder loginTimeoutMs(long v) {
       this.loginTimeoutMs = v;
+      return this;
+    }
+
+    public Builder loginPollIntervalMs(long v) {
+      this.loginPollIntervalMs = v;
       return this;
     }
 
@@ -228,6 +237,10 @@ public final class ILinkConfig {
 
   public long getLoginTimeoutMs() {
     return loginTimeoutMs;
+  }
+
+  public long getLoginPollIntervalMs() {
+    return loginPollIntervalMs;
   }
 
   public boolean isHeartbeatEnabled() {
